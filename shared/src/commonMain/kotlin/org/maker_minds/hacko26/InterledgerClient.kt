@@ -1,54 +1,74 @@
 package org.maker_minds.hacko26
 
 import io.ktor.client.*
+import io.ktor.client.call.body
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
+import io.ktor.http.*
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-
 @Serializable
-data class PaymentRequest(
-    val from: String,
-    val to: String,
-    val amount: Long
+data class StreamPaymentRequest(
+    @SerialName("senderAccount")
+    val senderAccount: String,
+    @SerialName("destinationPaymentPointer")
+    val destinationPaymentPointer: String,
+    @SerialName("sourceAmount")
+    val sourceAmount: String,
+    val protocol: String = "STREAM"
 )
 
+@Serializable
+data class StreamPaymentResponse(
+    val id: String? = null,
+    val status: String? = null,
+    val deliveredAmount: String? = null,
+    val message: String? = null
+)
 
-class InterledgerClient {
+class InterledgerClient(
+    private val streamSenderEndpoint: String
+) {
 
     private val client = getHttpClient()
 
-    private var selfAccount: String? = null
-    private var targetAccount: String? = null
-
-    fun setSelfAccount(address: String) {
-        selfAccount = address
-    }
-
-    fun setTargetAccount(address: String) {
-        targetAccount = address
-    }
-
-
-
     /**
-     * Sends a payment using Interledger REST endpoint.
-     * Throws IllegalStateException if accounts are not set.
+     * Sends a STREAM-compatible Interledger payment to a configurable remote wallet endpoint.
+     *
+     * Request body keys:
+     * - senderAccount
+     * - destinationPaymentPointer
+     * - sourceAmount
+     * - protocol (always "STREAM")
+     *
+     * Throws IllegalStateException when the HTTP status is not successful.
      */
-    suspend fun sendPayment(amount: Long): String {
-        val from = selfAccount ?: throw IllegalStateException("Self account not set")
-        val to = targetAccount ?: throw IllegalStateException("Target account not set")
+    suspend fun sendStreamPayment(
+        senderAccount: String,
+        destinationPaymentPointer: String,
+        amount: Long
+    ): StreamPaymentResponse {
+        val request = StreamPaymentRequest(
+            senderAccount = senderAccount,
+            destinationPaymentPointer = destinationPaymentPointer,
+            sourceAmount = amount.toString(),
+            protocol = "STREAM"
+        )
 
-        val request = PaymentRequest(from, to, amount)
-
-        val response: HttpResponse = client.post("https://your-ilp-node.example.com/pay") {
+        val response: HttpResponse = client.post(streamSenderEndpoint) {
+            contentType(ContentType.Application.Json)
             setBody(request)
         }
 
-        return response.bodyAsText()
+        if (!response.status.isSuccess()) {
+            throw IllegalStateException(
+                "STREAM payment failed (${response.status.value}): ${response.bodyAsText()}"
+            )
+        }
+
+        return response.body()
     }
-
-
 }
 
 expect fun getHttpClient(): HttpClient

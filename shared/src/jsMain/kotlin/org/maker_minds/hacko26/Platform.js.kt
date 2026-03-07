@@ -14,12 +14,14 @@ actual fun getHttpClient(): HttpClient = HttpClient(Js) {
     }
 }
 
-
-
 @OptIn(DelicateCoroutinesApi::class)
-fun InterledgerClient.sendPaymentAsync(amount: Long): dynamic {
+fun InterledgerClient.sendStreamPaymentAsync(
+    senderAccount: String,
+    destinationPaymentPointer: String,
+    amount: Long
+): dynamic {
     return kotlinx.coroutines.GlobalScope.async {
-        sendPayment(amount)
+        sendStreamPayment(senderAccount, destinationPaymentPointer, amount)
     }.asPromise()
 }
 
