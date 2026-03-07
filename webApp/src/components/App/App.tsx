@@ -80,6 +80,20 @@ function normalizeEndpoint(value: string): string {
   return value.trim();
 }
 
+function explainNetworkFailure(streamEndpoint: string): string {
+  const hints = [
+    `Could not reach STREAM endpoint: ${streamEndpoint}`,
+    'Make sure a backend server is running at this URL.',
+    'Ensure CORS allows requests from this website origin.'
+  ];
+
+  if (window.location.protocol === 'https:' && streamEndpoint.startsWith('http://')) {
+    hints.push('Your site is HTTPS but endpoint is HTTP. Use an HTTPS endpoint to avoid browser blocking.');
+  }
+
+  return hints.join(' ');
+}
+
 function createInterledgerClient(): InterledgerClient {
   let selfAccount = '';
   let targetAccount = '';
@@ -110,6 +124,12 @@ function createInterledgerClient(): InterledgerClient {
         throw new Error('Interledger STREAM endpoint is required.');
       }
 
+      try {
+        new URL(streamEndpoint);
+      } catch {
+        throw new Error('STREAM endpoint must be a valid URL, e.g. https://api.example.com/stream/send');
+      }
+
       const payload: StreamPaymentRequest = {
         senderAccount: selfAccount,
         destinationPaymentPointer: targetAccount,
@@ -125,11 +145,16 @@ function createInterledgerClient(): InterledgerClient {
         headers.Authorization = `Bearer ${authToken}`;
       }
 
-      const response = await fetch(streamEndpoint, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload)
-      });
+      let response: Response;
+      try {
+        response = await fetch(streamEndpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload)
+        });
+      } catch {
+        throw new Error(explainNetworkFailure(streamEndpoint));
+      }
 
       const responseText = await response.text();
       if (!response.ok) {
