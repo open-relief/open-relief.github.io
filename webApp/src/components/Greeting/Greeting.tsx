@@ -1,8 +1,9 @@
 import './Greeting.css';
 
 import { useState } from 'react';
+// @ts-ignore
 import { JSLogo } from '../JSLogo/JSLogo.tsx';
-import { Greeting as KotlinGreeting } from 'shared';
+import { Greeting as KotlinGreeting } from 'shared'
 import type { AnimationEvent } from 'react';
 
 export function Greeting() {

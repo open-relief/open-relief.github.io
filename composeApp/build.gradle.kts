@@ -1,4 +1,6 @@
-import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+//:composeApp
+
+
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -17,10 +19,17 @@ kotlin {
     
     sourceSets {
         androidMain.dependencies {
+            implementation("org.interledger:interledger-core:0.7.0") // adjust version
+            implementation("org.interledger:interledger-ilp:0.7.0") // core ILP client
+            implementation("org.interledger:interledger-crypto:0.7.0") // crypto utilities
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.activity.compose)
         }
         commonMain.dependencies {
+            implementation("io.ktor:ktor-client-core:2.3.4")
+            implementation("io.ktor:ktor-client-content-negotiation:2.3.4")
+            implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.4")
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
             implementation(libs.compose.material3)

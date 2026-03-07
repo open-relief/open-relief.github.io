@@ -1,3 +1,5 @@
+//:shared
+
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -33,8 +35,25 @@ kotlin {
     }
     
     sourceSets {
+        androidMain.dependencies {
+            implementation("io.ktor:ktor-client-okhttp:2.3.4")
+            implementation(libs.compose.uiToolingPreview)
+            implementation(libs.androidx.activity.compose)
+        }
         commonMain.dependencies {
-            // put your Multiplatform dependencies here
+                implementation("io.ktor:ktor-client-core:2.3.4")
+                implementation("io.ktor:ktor-client-content-negotiation:2.3.4")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.4")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+                implementation(libs.compose.runtime)
+                implementation(libs.compose.foundation)
+                implementation(libs.compose.material3)
+                implementation(libs.compose.ui)
+                implementation(libs.compose.components.resources)
+                implementation(libs.compose.uiToolingPreview)
+                implementation(libs.androidx.lifecycle.viewmodelCompose)
+                implementation(libs.androidx.lifecycle.runtimeCompose)
+                implementation(projects.shared)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
