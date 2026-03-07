@@ -5,7 +5,6 @@ import { FormEvent, useMemo, useState } from 'react';
 type InterledgerClient = {
   setSelfAccount: (value: string) => void;
   setTargetAccount: (value: string) => void;
-  setStreamEndpoint: (value: string) => void;
   setAuthToken: (value: string) => void;
   sendPayment: (amount: number) => Promise<unknown>;
 };
@@ -35,15 +34,28 @@ type AidRequest = {
 
 type AdminSettings = {
   fundWallet: string;
-  streamEndpoint: string;
   apiToken: string;
 };
 
-type StreamPaymentRequest = {
-  senderAccount: string;
-  destinationPaymentPointer: string;
-  sourceAmount: string;
-  protocol: 'STREAM';
+type PaymentPointerDetails = {
+  authServer: string;
+  resourceServer: string;
+  assetCode: string;
+  assetScale: number;
+};
+
+type AccessTokenResponse = {
+  access_token: string;
+};
+
+type QuoteResponse = {
+  id: string;
+};
+
+type PaymentCreateResponse = {
+  id?: string;
+  quoteId?: string;
+  status?: string;
 };
 
 type RequestFormState = {
@@ -76,77 +88,49 @@ function makeRequestId(): string {
   return `REQ-${Date.now().toString(36).toUpperCase()}`;
 }
 
-function normalizeEndpoint(value: string): string {
-  return value.trim();
-}
-
-function buildEndpointCandidates(configuredEndpoint: string): string[] {
-  const normalized = normalizeEndpoint(configuredEndpoint);
-  if (!normalized) {
-    return [];
+function pointerToUsername(pointer: string): string {
+  const trimmed = pointer.trim();
+  if (!trimmed) {
+    throw new Error('Destination payment pointer is required.');
   }
 
-  let url: URL;
-  try {
-    url = new URL(normalized);
-  } catch {
-    return [normalized];
-  }
-
-  const trimTrailingSlash = (value: string) => value.replace(/\/$/, '');
-  const base = trimTrailingSlash(url.toString());
-  const candidates = [base];
-
-  const path = url.pathname.replace(/\/$/, '');
-  const isBasePath = path === '' || path === '/';
-
-  if (isBasePath) {
-    const suffixes = ['/stream/send', '/api/stream/send', '/pay'];
-    for (const suffix of suffixes) {
-      const candidateUrl = new URL(url.toString());
-      candidateUrl.pathname = suffix;
-      candidateUrl.search = '';
-      candidateUrl.hash = '';
-      candidates.push(trimTrailingSlash(candidateUrl.toString()));
+  if (trimmed.startsWith('$')) {
+    const path = trimmed.slice(1);
+    const username = path.split('/').filter(Boolean).pop();
+    if (!username) {
+      throw new Error('Invalid payment pointer format.');
     }
+    return username;
   }
 
-  return Array.from(new Set(candidates));
+  try {
+    const url = new URL(trimmed);
+    const username = url.pathname.split('/').filter(Boolean).pop();
+    if (!username) {
+      throw new Error('Invalid payment pointer URL.');
+    }
+    return username;
+  } catch {
+    return trimmed;
+  }
 }
 
-function detectStreamEndpoint(): string {
-  const configuredEndpoint = normalizeEndpoint(import.meta.env.VITE_STREAM_SENDER_ENDPOINT ?? '');
-  if (configuredEndpoint) {
-    return configuredEndpoint;
+async function parseJsonOrThrow(response: Response, message: string) {
+  const responseText = await response.text();
+  if (!response.ok) {
+    throw new Error(`${message} (HTTP ${response.status}): ${responseText}`);
   }
 
-  const { protocol, hostname, origin } = window.location;
-  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-  if (isLocalhost) {
-    return `${protocol}//${hostname}:3000/stream/send`;
+  try {
+    return responseText ? JSON.parse(responseText) : {};
+  } catch {
+    throw new Error(`${message}: invalid JSON response`);
   }
-
-  return `${origin}/stream/send`;
-}
-
-function explainNetworkFailure(streamEndpoint: string): string {
-  const hints = [
-    `Could not reach STREAM endpoint: ${streamEndpoint}`,
-    'Make sure a backend server is running at this URL.',
-    'Ensure CORS allows requests from this website origin.'
-  ];
-
-  if (window.location.protocol === 'https:' && streamEndpoint.startsWith('http://')) {
-    hints.push('Your site is HTTPS but endpoint is HTTP. Use an HTTPS endpoint to avoid browser blocking.');
-  }
-
-  return hints.join(' ');
 }
 
 function createInterledgerClient(): InterledgerClient {
   let selfAccount = '';
   let targetAccount = '';
-  let streamEndpoint = detectStreamEndpoint();
   let authToken = (import.meta.env.VITE_INTERLEDGER_API_TOKEN ?? '').trim();
 
   return {
@@ -155,9 +139,6 @@ function createInterledgerClient(): InterledgerClient {
     },
     setTargetAccount: (value: string) => {
       targetAccount = value;
-    },
-    setStreamEndpoint: (value: string) => {
-      streamEndpoint = normalizeEndpoint(value);
     },
     setAuthToken: (value: string) => {
       authToken = value.trim();
@@ -169,91 +150,69 @@ function createInterledgerClient(): InterledgerClient {
       if (!targetAccount) {
         throw new Error('Destination payment pointer is required.');
       }
-      if (!streamEndpoint) {
-        throw new Error('Interledger STREAM endpoint is required.');
+
+      const normalizedAmount = Math.trunc(amount);
+      if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+        throw new Error('Amount must be a positive integer.');
       }
 
-      try {
-        new URL(streamEndpoint);
-      } catch {
-        throw new Error('STREAM endpoint must be a valid URL, e.g. https://api.example.com/stream/send');
-      }
+      const username = pointerToUsername(targetAccount);
+      const pointerResponse = await fetch(`https://ilp.interledger-test.dev/${encodeURIComponent(username)}`, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json'
+        }
+      });
+      const pointerDetails = (await parseJsonOrThrow(
+        pointerResponse,
+        'Failed to resolve payment pointer'
+      )) as PaymentPointerDetails;
 
-      const endpointCandidates = buildEndpointCandidates(streamEndpoint);
-      if (endpointCandidates.length === 0) {
-        throw new Error('Interledger STREAM endpoint is required.');
-      }
-
-      const payload: StreamPaymentRequest = {
-        senderAccount: selfAccount,
-        destinationPaymentPointer: targetAccount,
-        sourceAmount: String(Math.trunc(amount)),
-        protocol: 'STREAM'
+      const tokenHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+        Accept: 'application/json'
       };
-
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json'
-      };
-
       if (authToken) {
-        headers.Authorization = `Bearer ${authToken}`;
+        tokenHeaders.Authorization = `Bearer ${authToken}`;
       }
 
-      let sawNetworkFailure = false;
-      let lastRouteError = '';
+      const tokenResponse = await fetch(`${pointerDetails.authServer.replace(/\/$/, '')}/token`, {
+        method: 'POST',
+        headers: tokenHeaders,
+        body: JSON.stringify({ grant_type: 'client_credentials' })
+      });
+      const tokenJson = (await parseJsonOrThrow(tokenResponse, 'Failed to get access token')) as AccessTokenResponse;
 
-      for (const endpoint of endpointCandidates) {
-        let response: Response;
-
-        try {
-          response = await fetch(endpoint, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(payload)
-          });
-        } catch {
-          sawNetworkFailure = true;
-          continue;
-        }
-
-        const responseText = await response.text();
-        if (response.ok) {
-          if (!responseText) {
-            return {
-              senderAccount: selfAccount,
-              destinationPaymentPointer: targetAccount,
-              sourceAmount: String(Math.trunc(amount)),
-              protocol: 'STREAM',
-              status: 'ok'
-            };
+      const quoteResponse = await fetch(`${pointerDetails.resourceServer.replace(/\/$/, '')}/quotes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Authorization: `Bearer ${tokenJson.access_token}`
+        },
+        body: JSON.stringify({
+          receiver: { id: targetAccount },
+          method: 'fixed-send',
+          debitAmount: {
+            value: String(normalizedAmount),
+            assetCode: pointerDetails.assetCode,
+            assetScale: pointerDetails.assetScale
           }
+        })
+      });
+      const quote = (await parseJsonOrThrow(quoteResponse, 'Failed to create quote')) as QuoteResponse;
 
-          try {
-            return JSON.parse(responseText);
-          } catch {
-            return responseText;
-          }
-        }
+      const paymentResponse = await fetch(`${pointerDetails.resourceServer.replace(/\/$/, '')}/payments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Authorization: `Bearer ${tokenJson.access_token}`
+        },
+        body: JSON.stringify({ quoteId: quote.id, sender: selfAccount })
+      });
 
-        if (response.status === 404 || response.status === 405) {
-          lastRouteError = `Endpoint ${endpoint} returned HTTP ${response.status}.`;
-          continue;
-        }
-
-        throw new Error(responseText || `STREAM payment failed with HTTP ${response.status}.`);
-      }
-
-      if (lastRouteError) {
-        throw new Error(
-          `${lastRouteError} Tried: ${endpointCandidates.join(', ')}. Set STREAM Sender Endpoint to the exact POST route.`
-        );
-      }
-
-      if (sawNetworkFailure) {
-        throw new Error(explainNetworkFailure(streamEndpoint));
-      }
-
-      throw new Error('STREAM payment request failed before reaching a valid payout route.');
+      return (await parseJsonOrThrow(paymentResponse, 'Failed to create payment')) as PaymentCreateResponse;
     }
   };
 }
@@ -272,7 +231,6 @@ export function App() {
       const stored = readStoredJson<Partial<AdminSettings>>(SETTINGS_STORAGE_KEY, {});
       return {
         fundWallet: stored.fundWallet ?? '',
-        streamEndpoint: stored.streamEndpoint ?? detectStreamEndpoint(),
         apiToken: stored.apiToken ?? (import.meta.env.VITE_INTERLEDGER_API_TOKEN ?? '')
       };
     }
@@ -417,16 +375,10 @@ export function App() {
       return;
     }
 
-    if (!adminSettings.streamEndpoint.trim()) {
-      setAdminNotice({ kind: 'error', message: 'Set the STREAM sender endpoint in Admin Settings first.' });
-      return;
-    }
-
     setPayingRequestId(request.id);
     setAdminNotice({ kind: 'idle', message: `Sending payout for ${request.id}...` });
 
     try {
-      interledgerClient.setStreamEndpoint(adminSettings.streamEndpoint);
       interledgerClient.setAuthToken(adminSettings.apiToken);
       interledgerClient.setSelfAccount(adminSettings.fundWallet);
       interledgerClient.setTargetAccount(request.wallet);
@@ -668,21 +620,6 @@ export function App() {
                           })
                         }
                         placeholder="$community-fund.example.com"
-                      />
-                    </label>
-
-                    <label>
-                      STREAM Sender Endpoint
-                      <input
-                        type="url"
-                        value={adminSettings.streamEndpoint}
-                        onChange={(event) =>
-                          saveAdminSettings({
-                            ...adminSettings,
-                            streamEndpoint: event.target.value
-                          })
-                        }
-                        placeholder="https://api.example.com/stream/send"
                       />
                     </label>
 

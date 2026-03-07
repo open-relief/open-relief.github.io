@@ -7,20 +7,29 @@ import kotlin.test.assertFailsWith
 class SharedCommonTest {
 
     @Test
-    fun derivePaymentPointerEndpoint_convertsToHttpsUrl() {
+    fun normalizePointerToUsername_extractsFromDollarPrefix() {
         val client = InterledgerClient()
 
-        val endpoint = client.derivePaymentPointerEndpoint("$example.com/bob")
+        val username = client.normalizePointerToUsername("$ilp.interledger-test.dev/bob")
 
-        assertEquals("https://example.com/bob", endpoint)
+        assertEquals("bob", username)
     }
 
     @Test
-    fun derivePaymentPointerEndpoint_rejectsMissingPrefix() {
+    fun normalizePointerToUsername_extractsFromUrl() {
+        val client = InterledgerClient()
+
+        val username = client.normalizePointerToUsername("https://ilp.interledger-test.dev/alice")
+
+        assertEquals("alice", username)
+    }
+
+    @Test
+    fun normalizePointerToUsername_rejectsEmptyValue() {
         val client = InterledgerClient()
 
         assertFailsWith<IllegalArgumentException> {
-            client.derivePaymentPointerEndpoint("example.com/bob")
+            client.normalizePointerToUsername("   ")
         }
     }
 }
