@@ -7,6 +7,33 @@
 }
 
 body {
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  background: linear-gradient(160deg, #f4f7ff 0%, #eef2ff 45%, #f9fbff 100%);
+  padding: 24px;
+  font-family: Inter, 'Segoe UI', Roboto, Arial, sans-serif;
+}
+
+.portal {
+  width: min(1000px, 100%);
+  display: grid;
+  gap: 16px;
+}
+
+.portal-header,
+.panel {
+  background: #ffffff;
+  border: 1px solid #d9e2ff;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(43, 76, 203, 0.08);
+  padding: 24px;
+}
+
+.portal-header h1,
+.panel h2,
+.panel h3 {
   margin: 0;
   background: #070b14;
   color: #eef3ff;
@@ -123,6 +150,17 @@ button {
   border-radius: 12px;
   padding: 11px 16px;
   font-size: 0.96rem;
+  border: 1px solid #c6d3ff;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.95rem;
+}
+
+button {
+  border: none;
+  border-radius: 10px;
+  padding: 11px 14px;
+  font-size: 0.95rem;
   font-weight: 600;
   color: #f3f7ff;
   background: linear-gradient(180deg, #2d6bff 0%, #1f52c9 100%);
@@ -165,6 +203,22 @@ button.danger {
 .request-card p {
   margin: 10px 0 0;
   line-height: 1.55;
+button.secondary {
+  background: #6073a3;
+}
+
+button.active {
+  background: #1e4fd0;
+}
+
+button.danger {
+  background: #b42318;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .metrics-list {
@@ -185,6 +239,19 @@ button.danger {
 
 .status.error {
   color: #ff9ca8;
+.metrics-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
+.status.idle {
+  color: #4b5c88;
+}
+
+.status.error {
+  color: #b42318;
 }
 
 .badge {
@@ -225,6 +292,21 @@ td {
 
 th {
   background: rgba(22, 33, 58, 0.85);
+  background: #fde2e2;
+  color: #962d2d;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border: 1px solid #dbe4ff;
+  text-align: left;
+  padding: 8px;
+  vertical-align: top;
 }
 
 @media (max-width: 760px) {
@@ -244,5 +326,8 @@ th {
   th,
   td {
     padding: 9px;
+  .portal-header,
+  .panel {
+    padding: 16px;
   }
 }
