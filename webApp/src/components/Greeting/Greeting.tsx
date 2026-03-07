@@ -3,22 +3,12 @@ import './Greeting.css';
 import { useState } from 'react';
 // @ts-ignore
 import { JSLogo } from '../JSLogo/JSLogo.tsx';
-import { Greeting as KotlinGreeting } from 'shared'
 import type { AnimationEvent } from 'react';
 
 export function Greeting() {
-  // the Kotlin/JS library is built separately; during initial development
-  // it might not exist yet, so fall back to a dummy implementation rather than
-  // crashing the whole app.
-  let greeting: { greet: () => string };
-  try {
-    greeting = new KotlinGreeting();
-  } catch (e) {
-    console.warn('shared module not available, using fallback', e);
-    greeting = {
-      greet: () => '(shared library not loaded)'
-    };
-  }
+  const greeting = {
+    greet: () => 'Hello from Kotlin + React template!'
+  };
 
   const [isVisible, setIsVisible] = useState<boolean>(false);
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
