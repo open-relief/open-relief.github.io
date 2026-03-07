@@ -1,14 +1,59 @@
 .app-shell {
   min-height: 100vh;
-  display: grid;
-  place-items: center;
+  display: flex;
+  justify-content: center;
   background: linear-gradient(160deg, #f4f7ff 0%, #eef2ff 45%, #f9fbff 100%);
   padding: 24px;
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
 }
 
-.payment-card {
-  width: min(520px, 100%);
+.portal {
+  width: min(980px, 100%);
+  display: grid;
+  gap: 16px;
+}
+
+.portal-header {
+  background: #ffffff;
+  border: 1px solid #d9e2ff;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(43, 76, 203, 0.08);
+  padding: 20px 24px;
+}
+
+.portal-header h1 {
+  margin: 0;
+  color: #162447;
+}
+
+.portal-header p {
+  margin: 8px 0 0;
+  color: #4b5c88;
+}
+
+.top-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.top-nav button {
+  border: 1px solid #c7d4ff;
+  border-radius: 999px;
+  background: #f7f9ff;
+  color: #2b3d76;
+  padding: 8px 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.top-nav button.active {
+  border-color: #2d6bff;
+  background: #2d6bff;
+  color: #ffffff;
+}
+
+.panel {
   background: #ffffff;
   border: 1px solid #d9e2ff;
   border-radius: 16px;
@@ -18,9 +63,9 @@
   gap: 14px;
 }
 
-.payment-card h1 {
+.panel h2,
+.panel h3 {
   margin: 0;
-  font-size: 1.5rem;
   color: #162447;
 }
 
@@ -29,26 +74,63 @@
   color: #4b5c88;
 }
 
-.payment-card label {
+.grid-panel {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.info-card {
+  border: 1px solid #dde6ff;
+  border-radius: 12px;
+  padding: 14px;
+  background: #fbfcff;
+}
+
+.info-card h2 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+}
+
+.info-card p {
+  margin: 0;
+  color: #4b5c88;
+}
+
+.metrics-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #30477d;
+  display: grid;
+  gap: 5px;
+}
+
+.form-grid {
+  display: grid;
+  gap: 12px;
+}
+
+label {
   display: grid;
   gap: 6px;
   font-weight: 600;
   color: #243b73;
 }
 
-.payment-card input {
+input,
+textarea {
   border: 1px solid #c6d3ff;
   border-radius: 10px;
   padding: 10px 12px;
   font-size: 0.95rem;
+  font-family: inherit;
 }
 
-.payment-card input:focus {
+input:focus,
+textarea:focus {
   outline: 2px solid #9bb2ff;
   border-color: #9bb2ff;
 }
 
-.payment-card button {
+button {
   margin-top: 4px;
   border: none;
   border-radius: 10px;
@@ -60,9 +142,13 @@
   cursor: pointer;
 }
 
-.payment-card button:disabled {
+button:disabled {
   cursor: not-allowed;
   opacity: 0.7;
+}
+
+button.danger {
+  background: #b42318;
 }
 
 .status {
@@ -81,4 +167,93 @@
 
 .status.idle {
   color: #4b5c88;
+}
+
+.request-id {
+  margin: 4px 0 0;
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+.request-card {
+  border: 1px solid #dbe4ff;
+  border-radius: 12px;
+  padding: 14px;
+  background: #fcfdff;
+}
+
+.request-card h3,
+.request-card h4 {
+  margin: 0 0 6px;
+  color: #1f3773;
+}
+
+.request-card p {
+  margin: 4px 0;
+  color: #3b4f84;
+}
+
+.badge {
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.badge.pending {
+  background: #fff4d6;
+  color: #8f5f00;
+}
+
+.badge.approved {
+  background: #dcfce7;
+  color: #176a2e;
+}
+
+.badge.rejected {
+  background: #fde2e2;
+  color: #962d2d;
+}
+
+.badge.paid {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.admin-login {
+  width: min(380px, 100%);
+  display: grid;
+  gap: 10px;
+}
+
+pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #f5f8ff;
+  border: 1px solid #d8e3ff;
+  border-radius: 8px;
+  padding: 10px;
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  color: #233a72;
+}
+
+@media (max-width: 640px) {
+  .app-shell {
+    padding: 12px;
+  }
+
+  .panel,
+  .portal-header {
+    padding: 16px;
+  }
 }
