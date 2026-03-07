@@ -30,12 +30,12 @@ data class AccessTokenResponse(
 )
 
 @Serializable
-private data class QuoteReceiver(
+data class QuoteReceiver(
     val id: String
 )
 
 @Serializable
-private data class QuoteAmount(
+data class QuoteAmount(
     val value: String,
     val assetCode: String,
     val assetScale: Int
