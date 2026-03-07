@@ -7,45 +7,70 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 @Serializable
-data class StreamPaymentRequest(
-    @SerialName("senderAccount")
-    val from: String,
-    @SerialName("destinationPaymentPointer")
-    val to: String,
-    @SerialName("sourceAmount")
-    val amount: String,
-    val protocol: String = "STREAM"
+data class PaymentPointerResponse(
+    val authServer: String,
+    val resourceServer: String,
+    val assetCode: String,
+    val assetScale: Int
 )
 
 @Serializable
-data class StreamPaymentResponse(
+private data class AccessTokenRequest(
+    val grant_type: String = "client_credentials"
+)
+
+@Serializable
+data class AccessTokenResponse(
+    val access_token: String,
+    val token_type: String? = null,
+    val expires_in: Long? = null
+)
+
+@Serializable
+private data class QuoteReceiver(
+    val id: String
+)
+
+@Serializable
+private data class QuoteAmount(
+    val value: String,
+    val assetCode: String,
+    val assetScale: Int
+)
+
+@Serializable
+private data class QuoteRequest(
+    val receiver: QuoteReceiver,
+    val method: String = "fixed-send",
+    val debitAmount: QuoteAmount
+)
+
+@Serializable
+data class QuoteResponse(
+    val id: String,
+    val receiver: QuoteReceiver? = null,
+    val debitAmount: QuoteAmount? = null,
+    val receiveAmount: QuoteAmount? = null
+)
+
+@Serializable
+private data class PaymentRequest(
+    @SerialName("quoteId")
+    val quoteId: String
+)
+
+@Serializable
+data class PaymentResponse(
     val id: String? = null,
+    val quoteId: String? = null,
     val status: String? = null,
-    val deliveredAmount: String? = null,
-    val message: String? = null
+    val result: JsonObject? = null
 )
 
-@Serializable
-private data class PaymentPointerResolutionResponse(
-    @SerialName("destination_account")
-    val destinationAccount: String,
-    @SerialName("shared_secret")
-    val sharedSecret: String
-)
-
-data class ResolvedPaymentEndpoint(
-    val destinationAccount: String,
-    val sharedSecret: String
-)
-
-class PaymentPointerResolutionException(message: String, cause: Throwable? = null) :
-    IllegalStateException(message, cause)
-
-class InterledgerClient(
-    private val streamSenderEndpoint: String = "http://localhost:3000/stream/send"
-) {
+class InterledgerClient {
 
     private val client = getHttpClient()
 
@@ -61,71 +86,134 @@ class InterledgerClient(
     }
 
     /**
-     * Sends a STREAM-compatible payment request.
-     * Throws IllegalStateException if accounts are not set.
+     * Executes Open Payments flow used by the Interledger test wallet:
+     * 1) resolve payment pointer
+     * 2) create access token
+     * 3) create quote
+     * 4) create payment
      */
-    suspend fun sendPayment(amount: Long): String {
+    suspend fun sendPayment(amount: Long): PaymentResponse {
         val from = selfAccount ?: throw IllegalStateException("Self account not set")
         val to = targetAccount ?: throw IllegalStateException("Target account not set")
+        require(amount > 0) { "Amount must be greater than zero" }
 
-        val request = StreamPaymentRequest(from = from, to = to, amount = amount.toString())
+        val receiver = resolvePaymentPointer(to)
+        val accessToken = fetchAccessToken(receiver.authServer)
 
-        val response: HttpResponse = client.post(streamSenderEndpoint) {
-            contentType(ContentType.Application.Json)
-            setBody(request)
-        }
+        val quote = createQuote(
+            resourceServer = receiver.resourceServer,
+            accessToken = accessToken.access_token,
+            sender = from,
+            receiver = to,
+            amount = amount,
+            assetCode = receiver.assetCode,
+            assetScale = receiver.assetScale
+        )
 
-        return if (response.status.isSuccess()) {
-            runCatching {
-                response.body<StreamPaymentResponse>()
-            }.getOrNull()?.toString() ?: response.bodyAsText()
-        } else {
-            throw IllegalStateException(response.bodyAsText())
-        }
+        return createPayment(
+            resourceServer = receiver.resourceServer,
+            accessToken = accessToken.access_token,
+            quoteId = quote.id
+        )
     }
 
-    /**
-     * Resolves an Interledger payment pointer into its SPSP/Open Payments details.
-     */
-    suspend fun resolvePaymentPointer(paymentPointer: String): ResolvedPaymentEndpoint {
-        val endpointUrl = derivePaymentPointerEndpoint(paymentPointer)
+    suspend fun resolvePaymentPointer(paymentPointer: String): PaymentPointerResponse {
+        val username = normalizePointerToUsername(paymentPointer)
+        val endpointUrl = "https://ilp.interledger-test.dev/$username"
 
         val response = client.get(endpointUrl) {
-            header(HttpHeaders.Accept, "application/spsp4+json, application/monetization+json")
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
         }
 
+        ensureSuccess(response, "Failed to resolve payment pointer")
+        return response.body()
+    }
+
+    private suspend fun fetchAccessToken(authServer: String): AccessTokenResponse {
+        val tokenUrl = "${authServer.trimEnd('/')}/token"
+        val response = client.post(tokenUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            setBody(AccessTokenRequest())
+        }
+
+        ensureSuccess(response, "Failed to get access token")
+        return response.body()
+    }
+
+    private suspend fun createQuote(
+        resourceServer: String,
+        accessToken: String,
+        sender: String,
+        receiver: String,
+        amount: Long,
+        assetCode: String,
+        assetScale: Int
+    ): QuoteResponse {
+        val quoteUrl = "${resourceServer.trimEnd('/')}/quotes"
+        val response = client.post(quoteUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            bearerAuth(accessToken)
+            setBody(
+                QuoteRequest(
+                    receiver = QuoteReceiver(id = receiver),
+                    debitAmount = QuoteAmount(
+                        value = amount.toString(),
+                        assetCode = assetCode,
+                        assetScale = assetScale
+                    )
+                )
+            )
+            header("X-Sender", sender)
+        }
+
+        ensureSuccess(response, "Failed to create quote")
+        return response.body()
+    }
+
+    private suspend fun createPayment(
+        resourceServer: String,
+        accessToken: String,
+        quoteId: String
+    ): PaymentResponse {
+        val paymentsUrl = "${resourceServer.trimEnd('/')}/payments"
+        val response = client.post(paymentsUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            bearerAuth(accessToken)
+            setBody(PaymentRequest(quoteId = quoteId))
+        }
+
+        ensureSuccess(response, "Failed to create payment")
+        return response.body()
+    }
+
+    private suspend fun ensureSuccess(response: HttpResponse, message: String) {
         if (!response.status.isSuccess()) {
-            throw PaymentPointerResolutionException(
-                "Failed to resolve payment pointer. HTTP ${response.status.value}: ${response.bodyAsText()}"
-            )
-        }
-
-        return runCatching {
-            val body = response.body<PaymentPointerResolutionResponse>()
-            ResolvedPaymentEndpoint(
-                destinationAccount = body.destinationAccount,
-                sharedSecret = body.sharedSecret
-            )
-        }.getOrElse { error ->
-            throw PaymentPointerResolutionException(
-                "Invalid SPSP/Open Payments response for endpoint: $endpointUrl",
-                error
-            )
+            throw IllegalStateException("$message. HTTP ${response.status.value}: ${response.bodyAsText()}")
         }
     }
 
-    internal fun derivePaymentPointerEndpoint(paymentPointer: String): String {
-        val normalizedPointer = paymentPointer.trim()
-        require(normalizedPointer.startsWith("$")) {
-            "Payment pointer must start with '$'"
+    internal fun normalizePointerToUsername(paymentPointer: String): String {
+        val normalized = paymentPointer.trim()
+        require(normalized.isNotBlank()) { "Payment pointer cannot be empty" }
+
+        val rawValue = when {
+            normalized.startsWith("$") -> normalized.removePrefix("$")
+            normalized.startsWith("http://") || normalized.startsWith("https://") -> {
+                Url(normalized).encodedPath.removePrefix("/")
+            }
+            else -> normalized
         }
 
-        val path = normalizedPointer.removePrefix("$")
-        require(path.isNotBlank()) {
-            "Payment pointer cannot be empty"
-        }
+        val username = rawValue
+            .substringAfterLast('/')
+            .trim()
 
-        return "https://$path"
+        require(username.isNotBlank()) { "Invalid payment pointer username" }
+        return username
     }
 }
 
