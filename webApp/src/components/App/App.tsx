@@ -35,7 +35,6 @@ type AidRequest = {
 
 type AdminSettings = {
   fundWallet: string;
-  streamEndpoint: string;
   apiToken: string;
 };
 
@@ -80,6 +79,21 @@ function normalizeEndpoint(value: string): string {
   return value.trim();
 }
 
+function detectStreamEndpoint(): string {
+  const configuredEndpoint = normalizeEndpoint(import.meta.env.VITE_STREAM_SENDER_ENDPOINT ?? '');
+  if (configuredEndpoint) {
+    return configuredEndpoint;
+  }
+
+  const { protocol, hostname, origin } = window.location;
+  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+  if (isLocalhost) {
+    return `${protocol}//${hostname}:3000/stream/send`;
+  }
+
+  return `${origin}/stream/send`;
+}
+
 function explainNetworkFailure(streamEndpoint: string): string {
   const hints = [
     `Could not reach STREAM endpoint: ${streamEndpoint}`,
@@ -97,7 +111,7 @@ function explainNetworkFailure(streamEndpoint: string): string {
 function createInterledgerClient(): InterledgerClient {
   let selfAccount = '';
   let targetAccount = '';
-  let streamEndpoint = normalizeEndpoint(import.meta.env.VITE_STREAM_SENDER_ENDPOINT ?? '');
+  let streamEndpoint = detectStreamEndpoint();
   let authToken = (import.meta.env.VITE_INTERLEDGER_API_TOKEN ?? '').trim();
 
   return {
@@ -192,10 +206,11 @@ export function App() {
   const [adminSettings, setAdminSettings] = useState<AdminSettings>(() =>
     readStoredJson<AdminSettings>(SETTINGS_STORAGE_KEY, {
       fundWallet: '',
-      streamEndpoint: import.meta.env.VITE_STREAM_SENDER_ENDPOINT ?? '',
       apiToken: import.meta.env.VITE_INTERLEDGER_API_TOKEN ?? ''
     })
   );
+
+  const streamEndpoint = useMemo(() => detectStreamEndpoint(), []);
 
   const [requestForm, setRequestForm] = useState<RequestFormState>({
     requesterName: '',
@@ -336,16 +351,11 @@ export function App() {
       return;
     }
 
-    if (!adminSettings.streamEndpoint.trim()) {
-      setAdminNotice({ kind: 'error', message: 'Set the STREAM sender endpoint in Admin Settings first.' });
-      return;
-    }
-
     setPayingRequestId(request.id);
     setAdminNotice({ kind: 'idle', message: `Sending payout for ${request.id}...` });
 
     try {
-      interledgerClient.setStreamEndpoint(adminSettings.streamEndpoint);
+      interledgerClient.setStreamEndpoint(streamEndpoint);
       interledgerClient.setAuthToken(adminSettings.apiToken);
       interledgerClient.setSelfAccount(adminSettings.fundWallet);
       interledgerClient.setTargetAccount(request.wallet);
@@ -590,20 +600,9 @@ export function App() {
                       />
                     </label>
 
-                    <label>
-                      STREAM Sender Endpoint
-                      <input
-                        type="url"
-                        value={adminSettings.streamEndpoint}
-                        onChange={(event) =>
-                          saveAdminSettings({
-                            ...adminSettings,
-                            streamEndpoint: event.target.value
-                          })
-                        }
-                        placeholder="http://localhost:3000/stream/send"
-                      />
-                    </label>
+                    <p>
+                      <strong>STREAM Sender Endpoint:</strong> <code>{streamEndpoint}</code> (auto-detected)
+                    </p>
 
                     <label>
                       Bearer Token (optional)
