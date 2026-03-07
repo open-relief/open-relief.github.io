@@ -5,6 +5,8 @@ import { useMemo, useState } from 'react';
 type InterledgerClient = {
   setSelfAccount: (value: string) => void;
   setTargetAccount: (value: string) => void;
+  setStreamEndpoint: (value: string) => void;
+  setAuthToken: (value: string) => void;
   sendPayment: (amount: number) => Promise<unknown>;
 };
 
@@ -13,6 +15,7 @@ type PaymentStatus =
   | { kind: 'success'; message: string }
   | { kind: 'error'; message: string };
 
+<<<<<<< HEAD
 type StreamSendResponse = {
   id?: string;
   status?: string;
@@ -25,6 +28,24 @@ function createStreamCompatibleInterledgerClient(): InterledgerClient {
   let targetAccount = '';
   const streamEndpoint =
     import.meta.env.VITE_STREAM_SENDER_ENDPOINT ?? 'http://localhost:3000/stream/send';
+=======
+type StreamPaymentRequest = {
+  senderAccount: string;
+  destinationPaymentPointer: string;
+  sourceAmount: string;
+  protocol: 'STREAM';
+};
+
+function normalizeEndpoint(value: string): string {
+  return value.trim();
+}
+
+function createInterledgerClient(): InterledgerClient {
+  let selfAccount = '';
+  let targetAccount = '';
+  let streamEndpoint = normalizeEndpoint(import.meta.env.VITE_STREAM_SENDER_ENDPOINT ?? '');
+  let authToken = (import.meta.env.VITE_INTERLEDGER_API_TOKEN ?? '').trim();
+>>>>>>> 3e5f0bc (Use real STREAM API calls in web frontend)
 
   return {
     setSelfAccount: (value: string) => {
@@ -33,7 +54,14 @@ function createStreamCompatibleInterledgerClient(): InterledgerClient {
     setTargetAccount: (value: string) => {
       targetAccount = value;
     },
+    setStreamEndpoint: (value: string) => {
+      streamEndpoint = normalizeEndpoint(value);
+    },
+    setAuthToken: (value: string) => {
+      authToken = value.trim();
+    },
     sendPayment: async (amount: number) => {
+<<<<<<< HEAD
       if (!selfAccount) {
         throw new Error('Sender ILP account is required.');
       }
@@ -62,25 +90,67 @@ function createStreamCompatibleInterledgerClient(): InterledgerClient {
       const raw = (await response.json()) as StreamSendResponse;
       return {
         ...raw,
+=======
+      if (!streamEndpoint) {
+        throw new Error('Interledger STREAM endpoint is required.');
+      }
+
+      const payload: StreamPaymentRequest = {
+>>>>>>> 3e5f0bc (Use real STREAM API calls in web frontend)
         senderAccount: selfAccount,
         destinationPaymentPointer: targetAccount,
         sourceAmount: String(Math.trunc(amount)),
         protocol: 'STREAM'
       };
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+
+      if (authToken) {
+        headers.Authorization = `Bearer ${authToken}`;
+      }
+
+      const response = await fetch(streamEndpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+
+      const responseText = await response.text();
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${responseText || response.statusText}`);
+      }
+
+      if (!responseText) {
+        return { ok: true };
+      }
+
+      try {
+        return JSON.parse(responseText);
+      } catch {
+        return responseText;
+      }
     }
   };
 }
 
 export function App() {
+<<<<<<< HEAD
   const interledgerClient = useMemo(() => createStreamCompatibleInterledgerClient(), []);
+=======
+  const interledgerClient = useMemo(() => createInterledgerClient(), []);
+>>>>>>> 3e5f0bc (Use real STREAM API calls in web frontend)
 
+  const [streamEndpoint, setStreamEndpoint] = useState(import.meta.env.VITE_STREAM_SENDER_ENDPOINT ?? '');
+  const [apiToken, setApiToken] = useState(import.meta.env.VITE_INTERLEDGER_API_TOKEN ?? '');
   const [selfIlp, setSelfIlp] = useState('$alice.example.com');
   const [targetIlp, setTargetIlp] = useState('$bob.example.com');
   const [amount, setAmount] = useState('100');
   const [isSending, setIsSending] = useState(false);
   const [status, setStatus] = useState<PaymentStatus>({
     kind: 'idle',
-    message: 'Enter ILP accounts and an amount, then click Send Payment.'
+    message: 'Set your STREAM endpoint, ILP accounts, and amount, then click Send Payment.'
   });
 
   const handleSendPayment = async () => {
@@ -94,6 +164,8 @@ export function App() {
     setStatus({ kind: 'idle', message: 'Sending payment...' });
 
     try {
+      interledgerClient.setStreamEndpoint(streamEndpoint);
+      interledgerClient.setAuthToken(apiToken);
       interledgerClient.setSelfAccount(selfIlp.trim());
       interledgerClient.setTargetAccount(targetIlp.trim());
       const result = await interledgerClient.sendPayment(parsedAmount);
@@ -117,7 +189,32 @@ export function App() {
     <main className="app-shell">
       <section className="payment-card">
         <h1>Interledger Payment Demo</h1>
+<<<<<<< HEAD
         <p className="subtitle">Send a STREAM-compatible Interledger payment.</p>
+=======
+        <p className="subtitle">Send a STREAM-compatible Interledger payment request.</p>
+
+        <label>
+          STREAM Sender Endpoint
+          <input
+            type="url"
+            value={streamEndpoint}
+            onChange={(event) => setStreamEndpoint(event.target.value)}
+            placeholder="http://localhost:3000/stream/send"
+          />
+        </label>
+
+        <label>
+          Bearer Token (optional)
+          <input
+            type="password"
+            value={apiToken}
+            onChange={(event) => setApiToken(event.target.value)}
+            placeholder="Paste API token if required"
+            autoComplete="off"
+          />
+        </label>
+>>>>>>> 3e5f0bc (Use real STREAM API calls in web frontend)
 
         <label>
           Self ILP Address
