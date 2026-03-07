@@ -1,701 +1,179 @@
 import './App.css';
 
-import { FormEvent, useMemo, useState } from 'react';
+import { useState } from 'react';
 
-type InterledgerClient = {
-  setSelfAccount: (value: string) => void;
-  setTargetAccount: (value: string) => void;
-  setAuthToken: (value: string) => void;
-  sendPayment: (amount: number) => Promise<unknown>;
-};
-
-type PaymentStatus =
-  | { kind: 'idle'; message: string }
-  | { kind: 'success'; message: string }
-  | { kind: 'error'; message: string };
-
-type Page = 'home' | 'request' | 'status' | 'admin';
-
-type AidRequestStatus = 'pending' | 'approved' | 'rejected' | 'paid';
-
-type AidRequest = {
-  id: string;
-  requesterName: string;
-  contact: string;
-  location: string;
-  wallet: string;
-  requestedAmount: number;
-  reason: string;
-  status: AidRequestStatus;
-  submittedAt: string;
-  reviewedAt?: string;
-  payoutResult?: string;
-};
-
-type AdminSettings = {
-  fundWallet: string;
-  apiToken: string;
-};
-
-type PaymentPointerDetails = {
-  authServer: string;
-  resourceServer: string;
-  assetCode: string;
-  assetScale: number;
-};
-
-type AccessTokenResponse = {
-  access_token: string;
-};
-
-type QuoteResponse = {
-  id: string;
-};
-
-type PaymentCreateResponse = {
-  id?: string;
-  quoteId?: string;
-  status?: string;
-};
-
-type RequestFormState = {
-  requesterName: string;
-  contact: string;
-  location: string;
-  wallet: string;
-  requestedAmount: string;
-  reason: string;
-};
-
-const REQUESTS_STORAGE_KEY = 'hackomania-emergency-requests';
-const SETTINGS_STORAGE_KEY = 'hackomania-admin-settings';
-const DEFAULT_ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD ?? 'admin123';
-
-function readStoredJson<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeStoredJson<T>(key: string, value: T) {
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
-function makeRequestId(): string {
-  return `REQ-${Date.now().toString(36).toUpperCase()}`;
-}
-
-function pointerToUsername(pointer: string): string {
-  const trimmed = pointer.trim();
-  if (!trimmed) {
-    throw new Error('Destination payment pointer is required.');
-  }
-
-  if (trimmed.startsWith('$')) {
-    const path = trimmed.slice(1);
-    const username = path.split('/').filter(Boolean).pop();
-    if (!username) {
-      throw new Error('Invalid payment pointer format.');
-    }
-    return username;
-  }
-
-  try {
-    const url = new URL(trimmed);
-    const username = url.pathname.split('/').filter(Boolean).pop();
-    if (!username) {
-      throw new Error('Invalid payment pointer URL.');
-    }
-    return username;
-  } catch {
-    return trimmed;
-  }
-}
-
-async function parseJsonOrThrow(response: Response, message: string) {
-  const responseText = await response.text();
-  if (!response.ok) {
-    throw new Error(`${message} (HTTP ${response.status}): ${responseText}`);
-  }
-
-  try {
-    return responseText ? JSON.parse(responseText) : {};
-  } catch {
-    throw new Error(`${message}: invalid JSON response`);
-  }
-}
-
-function createInterledgerClient(): InterledgerClient {
-  let selfAccount = '';
-  let targetAccount = '';
-  let authToken = (import.meta.env.VITE_INTERLEDGER_API_TOKEN ?? '').trim();
-
-  return {
-    setSelfAccount: (value: string) => {
-      selfAccount = value;
-    },
-    setTargetAccount: (value: string) => {
-      targetAccount = value;
-    },
-    setAuthToken: (value: string) => {
-      authToken = value.trim();
-    },
-    sendPayment: async (amount: number) => {
-      if (!selfAccount) {
-        throw new Error('Sender ILP account is required.');
-      }
-      if (!targetAccount) {
-        throw new Error('Destination payment pointer is required.');
-      }
-
-      const normalizedAmount = Math.trunc(amount);
-      if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
-        throw new Error('Amount must be a positive integer.');
-      }
-
-      const username = pointerToUsername(targetAccount);
-      const pointerResponse = await fetch(`https://ilp.interledger-test.dev/${encodeURIComponent(username)}`, {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json'
-        }
-      });
-      const pointerDetails = (await parseJsonOrThrow(
-        pointerResponse,
-        'Failed to resolve payment pointer'
-      )) as PaymentPointerDetails;
-
-      const tokenHeaders: Record<string, string> = {
-        'Content-Type': 'application/json',
-        Accept: 'application/json'
-      };
-      if (authToken) {
-        tokenHeaders.Authorization = `Bearer ${authToken}`;
-      }
-
-      const tokenResponse = await fetch(`${pointerDetails.authServer.replace(/\/$/, '')}/token`, {
-        method: 'POST',
-        headers: tokenHeaders,
-        body: JSON.stringify({ grant_type: 'client_credentials' })
-      });
-      const tokenJson = (await parseJsonOrThrow(tokenResponse, 'Failed to get access token')) as AccessTokenResponse;
-
-      const quoteResponse = await fetch(`${pointerDetails.resourceServer.replace(/\/$/, '')}/quotes`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          Authorization: `Bearer ${tokenJson.access_token}`
-        },
-        body: JSON.stringify({
-          receiver: { id: targetAccount },
-          method: 'fixed-send',
-          debitAmount: {
-            value: String(normalizedAmount),
-            assetCode: pointerDetails.assetCode,
-            assetScale: pointerDetails.assetScale
-          }
-        })
-      });
-      const quote = (await parseJsonOrThrow(quoteResponse, 'Failed to create quote')) as QuoteResponse;
-
-      const paymentResponse = await fetch(`${pointerDetails.resourceServer.replace(/\/$/, '')}/payments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          Authorization: `Bearer ${tokenJson.access_token}`
-        },
-        body: JSON.stringify({ quoteId: quote.id, sender: selfAccount })
-      });
-
-      return (await parseJsonOrThrow(paymentResponse, 'Failed to create payment')) as PaymentCreateResponse;
-    }
-  };
-}
+import { Navbar } from '../Navbar/Navbar';
+import { ProtectedRoute } from '../ProtectedRoute/ProtectedRoute';
+import { authService } from '../../services/authService';
+import { donationService } from '../../services/donationService';
+import { fundingService } from '../../services/fundingService';
+import { sessionStore } from '../../state/sessionStore';
+import { AdminPage } from '../../pages/admin/AdminPage';
+import { DashboardPage } from '../../pages/dashboard/DashboardPage';
+import { DonatePage } from '../../pages/donate/DonatePage';
+import { LoginPage } from '../../pages/login/LoginPage';
+import { RequestFundingPage } from '../../pages/request-funding/RequestFundingPage';
+import { SignupPage } from '../../pages/signup/SignupPage';
+import { SurveyPage } from '../../pages/survey/SurveyPage';
+import { AppRoute, Session, SurveyData } from '../../types/models';
 
 export function App() {
-  const interledgerClient = useMemo(() => createInterledgerClient(), []);
+  const [session, setSession] = useState<Session | null>(sessionStore.sessionState.currentSession);
+  const [route, setRoute] = useState<AppRoute>(sessionStore.sessionState.currentRoute);
+  const [notice, setNotice] = useState('Prototype mode: all data is in-memory and resets on refresh.');
 
-  const [page, setPage] = useState<Page>('home');
-
-  const [requests, setRequests] = useState<AidRequest[]>(() =>
-    readStoredJson<AidRequest[]>(REQUESTS_STORAGE_KEY, [])
-  );
-
-  const [adminSettings, setAdminSettings] = useState<AdminSettings>(() =>
-    {
-      const stored = readStoredJson<Partial<AdminSettings>>(SETTINGS_STORAGE_KEY, {});
-      return {
-        fundWallet: stored.fundWallet ?? '',
-        apiToken: stored.apiToken ?? (import.meta.env.VITE_INTERLEDGER_API_TOKEN ?? '')
-      };
-    }
-  );
-
-  const [requestForm, setRequestForm] = useState<RequestFormState>({
-    requesterName: '',
-    contact: '',
-    location: '',
-    wallet: '',
-    requestedAmount: '50',
-    reason: ''
-  });
-
-  const [lookupId, setLookupId] = useState('');
-  const [latestRequestId, setLatestRequestId] = useState('');
-
-  const [adminPasswordInput, setAdminPasswordInput] = useState('');
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
-  const [payingRequestId, setPayingRequestId] = useState('');
-
-  const [requestNotice, setRequestNotice] = useState<PaymentStatus>({
-    kind: 'idle',
-    message: 'Fill the form to request emergency support.'
-  });
-
-  const [adminNotice, setAdminNotice] = useState<PaymentStatus>({
-    kind: 'idle',
-    message: 'Admin actions and payout events will appear here.'
-  });
-
-  const totals = useMemo(() => {
-    return {
-      total: requests.length,
-      pending: requests.filter((request) => request.status === 'pending').length,
-      approved: requests.filter((request) => request.status === 'approved').length,
-      paid: requests.filter((request) => request.status === 'paid').length
-    };
-  }, [requests]);
-
-  const sortedRequests = useMemo(() => {
-    return [...requests].sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
-  }, [requests]);
-
-  const matchedRequest = useMemo(() => {
-    const needle = lookupId.trim().toLowerCase();
-    if (!needle) {
-      return null;
-    }
-    return requests.find((request) => request.id.toLowerCase() === needle) ?? null;
-  }, [lookupId, requests]);
-
-  const saveRequests = (nextRequests: AidRequest[]) => {
-    setRequests(nextRequests);
-    writeStoredJson(REQUESTS_STORAGE_KEY, nextRequests);
+  const navigate = (nextRoute: AppRoute) => {
+    sessionStore.sessionState.currentRoute = nextRoute;
+    setRoute(nextRoute);
   };
 
-  const saveAdminSettings = (nextSettings: AdminSettings) => {
-    setAdminSettings(nextSettings);
-    writeStoredJson(SETTINGS_STORAGE_KEY, nextSettings);
+  const refreshSession = () => {
+    setSession(sessionStore.sessionState.currentSession);
   };
 
-  const handleSubmitRequest = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const parsedAmount = Number(requestForm.requestedAmount);
-    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-      setRequestNotice({ kind: 'error', message: 'Requested amount must be a positive number.' });
-      return;
-    }
-
-    if (!requestForm.wallet.trim()) {
-      setRequestNotice({ kind: 'error', message: 'Wallet / payment pointer is required.' });
-      return;
-    }
-
-    const newRequest: AidRequest = {
-      id: makeRequestId(),
-      requesterName: requestForm.requesterName.trim(),
-      contact: requestForm.contact.trim(),
-      location: requestForm.location.trim(),
-      wallet: requestForm.wallet.trim(),
-      requestedAmount: Math.trunc(parsedAmount),
-      reason: requestForm.reason.trim(),
-      status: 'pending',
-      submittedAt: new Date().toISOString()
-    };
-
-    const nextRequests = [newRequest, ...requests];
-    saveRequests(nextRequests);
-
-    setLatestRequestId(newRequest.id);
-    setLookupId(newRequest.id);
-    setRequestForm({
-      requesterName: '',
-      contact: '',
-      location: '',
-      wallet: '',
-      requestedAmount: '50',
-      reason: ''
-    });
-
-    setRequestNotice({
-      kind: 'success',
-      message: `Request submitted. Save your Request ID: ${newRequest.id}`
-    });
-  };
-
-  const handleAdminLogin = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (adminPasswordInput === DEFAULT_ADMIN_PASSWORD) {
-      setIsAdminAuthenticated(true);
-      setAdminPasswordInput('');
-      setAdminNotice({ kind: 'success', message: 'Admin login successful.' });
-      return;
-    }
-    setAdminNotice({ kind: 'error', message: 'Invalid admin password.' });
-  };
-
-  const updateRequestStatus = (requestId: string, nextStatus: AidRequestStatus) => {
-    const nextRequests = requests.map((request) => {
-      if (request.id !== requestId) {
-        return request;
-      }
-      return {
-        ...request,
-        status: nextStatus,
-        reviewedAt: new Date().toISOString()
-      };
-    });
-
-    saveRequests(nextRequests);
-
-    setAdminNotice({
-      kind: 'success',
-      message: `Request ${requestId} marked as ${nextStatus}.`
-    });
-  };
-
-  const handlePayout = async (request: AidRequest) => {
-    if (!adminSettings.fundWallet.trim()) {
-      setAdminNotice({ kind: 'error', message: 'Set the emergency fund wallet in Admin Settings first.' });
-      return;
-    }
-
-    setPayingRequestId(request.id);
-    setAdminNotice({ kind: 'idle', message: `Sending payout for ${request.id}...` });
-
+  const handleLogin = (email: string, password: string) => {
     try {
-      interledgerClient.setAuthToken(adminSettings.apiToken);
-      interledgerClient.setSelfAccount(adminSettings.fundWallet);
-      interledgerClient.setTargetAccount(request.wallet);
-      const result = await interledgerClient.sendPayment(request.requestedAmount);
-
-      const nextRequests: AidRequest[] = requests.map((current) => {
-        if (current.id !== request.id) {
-          return current;
-        }
-        return {
-          ...current,
-          status: 'paid' as AidRequestStatus,
-          reviewedAt: new Date().toISOString(),
-          payoutResult: JSON.stringify(result)
-        };
-      });
-
-      saveRequests(nextRequests);
-
-      setAdminNotice({
-        kind: 'success',
-        message: `Payout sent for ${request.id}.`
-      });
+      const nextSession = authService.login(email, password);
+      setSession(nextSession);
+      navigate(nextSession.user.role === 'admin' ? 'admin' : 'dashboard');
+      setNotice('Logged in successfully.');
     } catch (error) {
-      console.error('Payment failed', error);
-      setAdminNotice({
-        kind: 'error',
-        message: `Payout failed: ${error instanceof Error ? error.message : String(error)}`
-      });
-    } finally {
-      setPayingRequestId('');
+      setNotice(error instanceof Error ? error.message : 'Login failed.');
     }
+  };
+
+  const handleSignup = (email: string, password: string) => {
+    try {
+      authService.signup(email, password);
+      refreshSession();
+      navigate('survey');
+      setNotice('Account created. Please finish first-time onboarding.');
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Signup failed.');
+    }
+  };
+
+  const handleSurveySubmit = (surveyData: SurveyData) => {
+    if (!sessionStore.sessionState.currentSession) {
+      setNotice('No active session. Please login again.');
+      navigate('login');
+      return;
+    }
+
+    sessionStore.sessionState.currentSession = {
+      ...sessionStore.sessionState.currentSession,
+      surveyData,
+      user: {
+        ...sessionStore.sessionState.currentSession.user,
+        isFirstSignup: false
+      }
+    };
+
+    refreshSession();
+    navigate('dashboard');
+    setNotice('Onboarding survey submitted and attached to this session.');
+  };
+
+  const handleDonate = async (amount: number) => {
+    if (!session) {
+      setNotice('Please login first.');
+      return;
+    }
+
+    await donationService.donate(session.user.id, amount);
+    setNotice('Thank you for contributing to the community emergency fund.');
+  };
+
+  const handleRequestFunding = (input: { requestedAmount: number; reason: string; urgency: 'low' | 'medium' | 'high' }) => {
+    if (!session) {
+      setNotice('Please login first.');
+      return;
+    }
+
+    fundingService.createRequest({
+      userId: session.user.id,
+      requestedAmount: input.requestedAmount,
+      reason: input.reason,
+      urgency: input.urgency
+    });
+
+    setNotice('Funding request submitted successfully.');
+  };
+
+  const handleApprove = async (requestId: string, userId: string) => {
+    const requesterSession = sessionStore.users.find((user) => user.id === userId);
+    if (!requesterSession) {
+      setNotice('Could not find user for payout.');
+      return;
+    }
+
+    const payoutPointer = sessionStore.sessionState.currentSession?.surveyData?.paymentPointer || '$example.wallet/alice';
+    await fundingService.approve(requestId, payoutPointer);
+    setNotice(`Request ${requestId} approved and payout triggered.`);
+    setRoute('admin');
+  };
+
+  const handleReject = (requestId: string) => {
+    fundingService.reject(requestId);
+    setNotice(`Request ${requestId} rejected.`);
+    setRoute('admin');
+  };
+
+  const handleLogout = () => {
+    authService.logout();
+    refreshSession();
+    navigate('login');
+    setNotice('Logged out.');
   };
 
   return (
     <main className="app-shell">
       <section className="portal">
         <header className="portal-header">
-          <h1>Community Emergency Fund</h1>
-          <p>Community-powered requests and admin-managed instant payouts via Interledger.</p>
+          <h1>Community Emergency Fund Prototype</h1>
+          <p>Open Payments-powered donation and emergency relief flow with in-memory role-based controls.</p>
         </header>
 
-        <nav className="top-nav">
-          <button className={page === 'home' ? 'active' : ''} onClick={() => setPage('home')}>
-            Home
-          </button>
-          <button className={page === 'request' ? 'active' : ''} onClick={() => setPage('request')}>
-            Request Aid
-          </button>
-          <button className={page === 'status' ? 'active' : ''} onClick={() => setPage('status')}>
-            Check Status
-          </button>
-          <button className={page === 'admin' ? 'active' : ''} onClick={() => setPage('admin')}>
-            Admin Panel
-          </button>
-        </nav>
+        <Navbar session={session} currentRoute={route} onNavigate={navigate} onLogout={handleLogout} />
 
-        {page === 'home' && (
-          <section className="panel grid-panel">
-            <article className="info-card">
-              <h2>How It Works</h2>
-              <p>
-                Residents submit emergency requests, admins review evidence, and approved requests are paid instantly from
-                the fund wallet.
-              </p>
-            </article>
-            <article className="info-card">
-              <h2>Live Summary</h2>
-              <ul className="metrics-list">
-                <li>Total Requests: {totals.total}</li>
-                <li>Pending Review: {totals.pending}</li>
-                <li>Approved: {totals.approved}</li>
-                <li>Paid: {totals.paid}</li>
-              </ul>
-            </article>
-            <article className="info-card">
-              <h2>Transparency Rule</h2>
-              <p>Every request keeps a visible status trail: submitted, reviewed, approved or rejected, and paid.</p>
-            </article>
-          </section>
+        {route === 'login' && <LoginPage onLogin={handleLogin} onGoToSignup={() => navigate('signup')} />}
+        {route === 'signup' && <SignupPage onSignup={handleSignup} onGoToLogin={() => navigate('login')} />}
+        {route === 'survey' && (
+          <ProtectedRoute session={session} allow={['user']}>
+            <SurveyPage onSubmit={handleSurveySubmit} />
+          </ProtectedRoute>
         )}
-
-        {page === 'request' && (
-          <section className="panel">
-            <h2>Request Emergency Support</h2>
-            <p className="subtitle">Submit your details so admins can review and approve payouts quickly.</p>
-
-            <form className="form-grid" onSubmit={handleSubmitRequest}>
-              <label>
-                Full Name
-                <input
-                  type="text"
-                  value={requestForm.requesterName}
-                  onChange={(event) => setRequestForm({ ...requestForm, requesterName: event.target.value })}
-                  required
-                />
-              </label>
-
-              <label>
-                Contact
-                <input
-                  type="text"
-                  value={requestForm.contact}
-                  onChange={(event) => setRequestForm({ ...requestForm, contact: event.target.value })}
-                  placeholder="Phone or email"
-                  required
-                />
-              </label>
-
-              <label>
-                Location
-                <input
-                  type="text"
-                  value={requestForm.location}
-                  onChange={(event) => setRequestForm({ ...requestForm, location: event.target.value })}
-                  placeholder="City / district"
-                  required
-                />
-              </label>
-
-              <label>
-                Wallet / Payment Pointer
-                <input
-                  type="text"
-                  value={requestForm.wallet}
-                  onChange={(event) => setRequestForm({ ...requestForm, wallet: event.target.value })}
-                  placeholder="$you.example.com"
-                  required
-                />
-              </label>
-
-              <label>
-                Requested Amount
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={requestForm.requestedAmount}
-                  onChange={(event) => setRequestForm({ ...requestForm, requestedAmount: event.target.value })}
-                  required
-                />
-              </label>
-
-              <label>
-                Reason
-                <textarea
-                  value={requestForm.reason}
-                  onChange={(event) => setRequestForm({ ...requestForm, reason: event.target.value })}
-                  rows={4}
-                  placeholder="Describe your emergency situation"
-                  required
-                />
-              </label>
-
-              <button type="submit">Submit Request</button>
-            </form>
-
-            <p className={`status ${requestNotice.kind}`}>{requestNotice.message}</p>
-            {latestRequestId && <p className="request-id">Latest Request ID: {latestRequestId}</p>}
-          </section>
+        {route === 'dashboard' && (
+          <ProtectedRoute session={session} allow={['user']}>
+            {session ? <DashboardPage session={session} onNavigate={navigate} /> : null}
+          </ProtectedRoute>
         )}
-
-        {page === 'status' && (
-          <section className="panel">
-            <h2>Check Request Status</h2>
-            <p className="subtitle">Enter your Request ID to track review and payout progress.</p>
-
-            <label>
-              Request ID
-              <input
-                type="text"
-                value={lookupId}
-                onChange={(event) => setLookupId(event.target.value)}
-                placeholder="REQ-..."
+        {route === 'donate' && (
+          <ProtectedRoute session={session} allow={['user', 'admin']}>
+            <DonatePage onDonate={handleDonate} />
+          </ProtectedRoute>
+        )}
+        {route === 'request-funding' && (
+          <ProtectedRoute session={session} allow={['user', 'admin']}>
+            <RequestFundingPage onRequestFunding={handleRequestFunding} />
+          </ProtectedRoute>
+        )}
+        {route === 'admin' && (
+          <ProtectedRoute session={session} allow={['admin']}>
+            {session ? (
+              <AdminPage
+                session={session}
+                users={sessionStore.users}
+                donationLogs={sessionStore.donationLogs}
+                fundingRequests={fundingService.getRequests()}
+                onApprove={handleApprove}
+                onReject={handleReject}
               />
-            </label>
-
-            {!lookupId.trim() && <p className="status idle">Enter a request ID to view details.</p>}
-
-            {lookupId.trim() && !matchedRequest && <p className="status error">No request found for that ID.</p>}
-
-            {matchedRequest && (
-              <article className="request-card">
-                <h3>{matchedRequest.id}</h3>
-                <p>
-                  <strong>Name:</strong> {matchedRequest.requesterName}
-                </p>
-                <p>
-                  <strong>Location:</strong> {matchedRequest.location}
-                </p>
-                <p>
-                  <strong>Wallet:</strong> {matchedRequest.wallet}
-                </p>
-                <p>
-                  <strong>Amount:</strong> {matchedRequest.requestedAmount}
-                </p>
-                <p>
-                  <strong>Status:</strong> <span className={`badge ${matchedRequest.status}`}>{matchedRequest.status}</span>
-                </p>
-              </article>
-            )}
-          </section>
+            ) : null}
+          </ProtectedRoute>
         )}
 
-        {page === 'admin' && (
-          <section className="panel">
-            <h2>Admin Panel</h2>
-
-            {!isAdminAuthenticated && (
-              <form className="admin-login" onSubmit={handleAdminLogin}>
-                <label>
-                  Admin Password
-                  <input
-                    type="password"
-                    value={adminPasswordInput}
-                    onChange={(event) => setAdminPasswordInput(event.target.value)}
-                    placeholder="Enter admin password"
-                    required
-                  />
-                </label>
-                <button type="submit">Login</button>
-              </form>
-            )}
-
-            {isAdminAuthenticated && (
-              <>
-                <section className="admin-settings">
-                  <h3>Fund & API Settings</h3>
-                  <div className="form-grid">
-                    <label>
-                      Fund Wallet (Admin)
-                      <input
-                        type="text"
-                        value={adminSettings.fundWallet}
-                        onChange={(event) =>
-                          saveAdminSettings({
-                            ...adminSettings,
-                            fundWallet: event.target.value
-                          })
-                        }
-                        placeholder="$community-fund.example.com"
-                      />
-                    </label>
-
-                    <label>
-                      Bearer Token (optional)
-                      <input
-                        type="password"
-                        value={adminSettings.apiToken}
-                        onChange={(event) =>
-                          saveAdminSettings({
-                            ...adminSettings,
-                            apiToken: event.target.value
-                          })
-                        }
-                        autoComplete="off"
-                      />
-                    </label>
-                  </div>
-                </section>
-
-                <section className="admin-queue">
-                  <h3>Request Queue</h3>
-                  {sortedRequests.length === 0 && <p className="status idle">No requests yet.</p>}
-
-                  {sortedRequests.map((request) => (
-                    <article className="request-card" key={request.id}>
-                      <h4>{request.id}</h4>
-                      <p>
-                        <strong>{request.requesterName}</strong> requested <strong>{request.requestedAmount}</strong>
-                      </p>
-                      <p>{request.reason}</p>
-                      <p>
-                        Wallet: <code>{request.wallet}</code>
-                      </p>
-                      <p>
-                        Status: <span className={`badge ${request.status}`}>{request.status}</span>
-                      </p>
-
-                      <div className="row-actions">
-                        {request.status === 'pending' && (
-                          <>
-                            <button type="button" onClick={() => updateRequestStatus(request.id, 'approved')}>
-                              Approve
-                            </button>
-                            <button type="button" className="danger" onClick={() => updateRequestStatus(request.id, 'rejected')}>
-                              Reject
-                            </button>
-                          </>
-                        )}
-
-                        {request.status === 'approved' && (
-                          <button
-                            type="button"
-                            onClick={() => handlePayout(request)}
-                            disabled={payingRequestId === request.id}
-                          >
-                            {payingRequestId === request.id ? 'Paying...' : 'Pay Out Now'}
-                          </button>
-                        )}
-                      </div>
-
-                      {request.payoutResult && (
-                        <details>
-                          <summary>Payout Result</summary>
-                          <pre>{request.payoutResult}</pre>
-                        </details>
-                      )}
-                    </article>
-                  ))}
-                </section>
-              </>
-            )}
-
-            <p className={`status ${adminNotice.kind}`}>{adminNotice.message}</p>
-          </section>
-        )}
+        <p className="status idle">{notice}</p>
       </section>
     </main>
   );
