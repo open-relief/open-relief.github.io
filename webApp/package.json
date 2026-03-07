@@ -4,7 +4,7 @@
   "description": "Web application that uses Kotlin Multiplatform Library",
   "type": "module",
   "scripts": {
-    "build": "tsc && vite build",
+    "build": "./gradlew jsBrowserProductionLibraryDistribution && cd webApp && npm run build",
     "start": "vite"
   },
   "dependencies": {
