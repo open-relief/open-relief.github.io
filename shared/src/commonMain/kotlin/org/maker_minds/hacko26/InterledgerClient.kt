@@ -1,14 +1,9 @@
-@file:JsExport
-@file:Suppress("NON_EXPORTABLE_TYPE")
+package org.maker_minds.hacko26
 
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.async
 import kotlinx.serialization.Serializable
-import kotlin.js.ExperimentalJsExport
-import kotlin.js.JsExport
 
 
 @Serializable
@@ -19,8 +14,6 @@ data class PaymentRequest(
 )
 
 
-@OptIn(ExperimentalJsExport::class)
-@JsExport
 class InterledgerClient {
 
     private val client = getHttpClient()
