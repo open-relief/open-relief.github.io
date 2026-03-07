@@ -39,7 +39,7 @@ jobs:
           ./gradlew :shared:jsBrowserDevelopmentLibraryDistribution
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build web app
         run: npm run build
