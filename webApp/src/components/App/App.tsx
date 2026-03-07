@@ -13,9 +13,18 @@ type PaymentStatus =
   | { kind: 'success'; message: string }
   | { kind: 'error'; message: string };
 
-function createSampleInterledgerClient(): InterledgerClient {
+type StreamSendResponse = {
+  id?: string;
+  status?: string;
+  deliveredAmount?: string | number;
+  [key: string]: unknown;
+};
+
+function createStreamCompatibleInterledgerClient(): InterledgerClient {
   let selfAccount = '';
   let targetAccount = '';
+  const streamEndpoint =
+    import.meta.env.VITE_STREAM_SENDER_ENDPOINT ?? 'http://localhost:3000/stream/send';
 
   return {
     setSelfAccount: (value: string) => {
@@ -25,20 +34,45 @@ function createSampleInterledgerClient(): InterledgerClient {
       targetAccount = value;
     },
     sendPayment: async (amount: number) => {
-      await new Promise((resolve) => setTimeout(resolve, 700));
+      if (!selfAccount) {
+        throw new Error('Sender ILP account is required.');
+      }
+      if (!targetAccount) {
+        throw new Error('Destination payment pointer is required.');
+      }
+
+      const response = await fetch(streamEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          senderAccount: selfAccount,
+          destinationPaymentPointer: targetAccount,
+          sourceAmount: String(Math.trunc(amount)),
+          protocol: 'STREAM'
+        })
+      });
+
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(body || `STREAM payment failed with HTTP ${response.status}.`);
+      }
+
+      const raw = (await response.json()) as StreamSendResponse;
       return {
-        ok: true,
-        selfAccount,
-        targetAccount,
-        amount,
-        transactionId: crypto.randomUUID()
+        ...raw,
+        senderAccount: selfAccount,
+        destinationPaymentPointer: targetAccount,
+        sourceAmount: String(Math.trunc(amount)),
+        protocol: 'STREAM'
       };
     }
   };
 }
 
 export function App() {
-  const interledgerClient = useMemo(() => createSampleInterledgerClient(), []);
+  const interledgerClient = useMemo(() => createStreamCompatibleInterledgerClient(), []);
 
   const [selfIlp, setSelfIlp] = useState('$alice.example.com');
   const [targetIlp, setTargetIlp] = useState('$bob.example.com');
@@ -83,7 +117,7 @@ export function App() {
     <main className="app-shell">
       <section className="payment-card">
         <h1>Interledger Payment Demo</h1>
-        <p className="subtitle">Set your ILP accounts and send a sample payment.</p>
+        <p className="subtitle">Send a STREAM-compatible Interledger payment.</p>
 
         <label>
           Self ILP Address
