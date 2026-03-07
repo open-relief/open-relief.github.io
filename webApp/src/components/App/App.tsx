@@ -35,6 +35,7 @@ type AidRequest = {
 
 type AdminSettings = {
   fundWallet: string;
+  streamEndpoint: string;
   apiToken: string;
 };
 
@@ -77,6 +78,40 @@ function makeRequestId(): string {
 
 function normalizeEndpoint(value: string): string {
   return value.trim();
+}
+
+function buildEndpointCandidates(configuredEndpoint: string): string[] {
+  const normalized = normalizeEndpoint(configuredEndpoint);
+  if (!normalized) {
+    return [];
+  }
+
+  let url: URL;
+  try {
+    url = new URL(normalized);
+  } catch {
+    return [normalized];
+  }
+
+  const trimTrailingSlash = (value: string) => value.replace(/\/$/, '');
+  const base = trimTrailingSlash(url.toString());
+  const candidates = [base];
+
+  const path = url.pathname.replace(/\/$/, '');
+  const isBasePath = path === '' || path === '/';
+
+  if (isBasePath) {
+    const suffixes = ['/stream/send', '/api/stream/send', '/pay'];
+    for (const suffix of suffixes) {
+      const candidateUrl = new URL(url.toString());
+      candidateUrl.pathname = suffix;
+      candidateUrl.search = '';
+      candidateUrl.hash = '';
+      candidates.push(trimTrailingSlash(candidateUrl.toString()));
+    }
+  }
+
+  return Array.from(new Set(candidates));
 }
 
 function detectStreamEndpoint(): string {
@@ -144,6 +179,11 @@ function createInterledgerClient(): InterledgerClient {
         throw new Error('STREAM endpoint must be a valid URL, e.g. https://api.example.com/stream/send');
       }
 
+      const endpointCandidates = buildEndpointCandidates(streamEndpoint);
+      if (endpointCandidates.length === 0) {
+        throw new Error('Interledger STREAM endpoint is required.');
+      }
+
       const payload: StreamPaymentRequest = {
         senderAccount: selfAccount,
         destinationPaymentPointer: targetAccount,
@@ -159,37 +199,61 @@ function createInterledgerClient(): InterledgerClient {
         headers.Authorization = `Bearer ${authToken}`;
       }
 
-      let response: Response;
-      try {
-        response = await fetch(streamEndpoint, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(payload)
-        });
-      } catch {
-        throw new Error(explainNetworkFailure(streamEndpoint));
-      }
+      let sawNetworkFailure = false;
+      let lastRouteError = '';
 
-      const responseText = await response.text();
-      if (!response.ok) {
+      for (const endpoint of endpointCandidates) {
+        let response: Response;
+
+        try {
+          response = await fetch(endpoint, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(payload)
+          });
+        } catch {
+          sawNetworkFailure = true;
+          continue;
+        }
+
+        const responseText = await response.text();
+        if (response.ok) {
+          if (!responseText) {
+            return {
+              senderAccount: selfAccount,
+              destinationPaymentPointer: targetAccount,
+              sourceAmount: String(Math.trunc(amount)),
+              protocol: 'STREAM',
+              status: 'ok'
+            };
+          }
+
+          try {
+            return JSON.parse(responseText);
+          } catch {
+            return responseText;
+          }
+        }
+
+        if (response.status === 404 || response.status === 405) {
+          lastRouteError = `Endpoint ${endpoint} returned HTTP ${response.status}.`;
+          continue;
+        }
+
         throw new Error(responseText || `STREAM payment failed with HTTP ${response.status}.`);
       }
 
-      if (!responseText) {
-        return {
-          senderAccount: selfAccount,
-          destinationPaymentPointer: targetAccount,
-          sourceAmount: String(Math.trunc(amount)),
-          protocol: 'STREAM',
-          status: 'ok'
-        };
+      if (lastRouteError) {
+        throw new Error(
+          `${lastRouteError} Tried: ${endpointCandidates.join(', ')}. Set STREAM Sender Endpoint to the exact POST route.`
+        );
       }
 
-      try {
-        return JSON.parse(responseText);
-      } catch {
-        return responseText;
+      if (sawNetworkFailure) {
+        throw new Error(explainNetworkFailure(streamEndpoint));
       }
+
+      throw new Error('STREAM payment request failed before reaching a valid payout route.');
     }
   };
 }
@@ -204,13 +268,15 @@ export function App() {
   );
 
   const [adminSettings, setAdminSettings] = useState<AdminSettings>(() =>
-    readStoredJson<AdminSettings>(SETTINGS_STORAGE_KEY, {
-      fundWallet: '',
-      apiToken: import.meta.env.VITE_INTERLEDGER_API_TOKEN ?? ''
-    })
+    {
+      const stored = readStoredJson<Partial<AdminSettings>>(SETTINGS_STORAGE_KEY, {});
+      return {
+        fundWallet: stored.fundWallet ?? '',
+        streamEndpoint: stored.streamEndpoint ?? detectStreamEndpoint(),
+        apiToken: stored.apiToken ?? (import.meta.env.VITE_INTERLEDGER_API_TOKEN ?? '')
+      };
+    }
   );
-
-  const streamEndpoint = useMemo(() => detectStreamEndpoint(), []);
 
   const [requestForm, setRequestForm] = useState<RequestFormState>({
     requesterName: '',
@@ -351,11 +417,16 @@ export function App() {
       return;
     }
 
+    if (!adminSettings.streamEndpoint.trim()) {
+      setAdminNotice({ kind: 'error', message: 'Set the STREAM sender endpoint in Admin Settings first.' });
+      return;
+    }
+
     setPayingRequestId(request.id);
     setAdminNotice({ kind: 'idle', message: `Sending payout for ${request.id}...` });
 
     try {
-      interledgerClient.setStreamEndpoint(streamEndpoint);
+      interledgerClient.setStreamEndpoint(adminSettings.streamEndpoint);
       interledgerClient.setAuthToken(adminSettings.apiToken);
       interledgerClient.setSelfAccount(adminSettings.fundWallet);
       interledgerClient.setTargetAccount(request.wallet);
@@ -600,9 +671,20 @@ export function App() {
                       />
                     </label>
 
-                    <p>
-                      <strong>STREAM Sender Endpoint:</strong> <code>{streamEndpoint}</code> (auto-detected)
-                    </p>
+                    <label>
+                      STREAM Sender Endpoint
+                      <input
+                        type="url"
+                        value={adminSettings.streamEndpoint}
+                        onChange={(event) =>
+                          saveAdminSettings({
+                            ...adminSettings,
+                            streamEndpoint: event.target.value
+                          })
+                        }
+                        placeholder="https://api.example.com/stream/send"
+                      />
+                    </label>
 
                     <label>
                       Bearer Token (optional)
