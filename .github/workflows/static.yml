@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: "pages"
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -26,6 +26,22 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+          cache: gradle
+
+      - name: Detect shared changes
+        id: paths
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            shared:
+              - 'shared/**'
+              - 'composeApp/**'
+              - 'gradle/**'
+              - 'build.gradle.kts'
+              - 'settings.gradle.kts'
+              - 'gradle.properties'
+              - 'gradlew'
+              - 'gradlew.bat'
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -34,9 +50,14 @@ jobs:
           cache: npm
 
       - name: Build shared Kotlin/JS library
+        if: steps.paths.outputs.shared == 'true'
         run: |
           chmod +x ./gradlew
           ./gradlew :shared:jsBrowserDevelopmentLibraryDistribution
+
+      - name: Skip shared build (unchanged)
+        if: steps.paths.outputs.shared != 'true'
+        run: echo "No shared-module changes detected. Skipping Kotlin/JS rebuild."
 
       - name: Install dependencies
         run: npm install
