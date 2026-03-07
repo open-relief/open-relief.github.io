@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Login</title>
+    <style>
+      :root {
+        --bg: #f4f7ff;
+        --ink: #1f2942;
+        --muted: #66708f;
+        --line: #dbe2f5;
+        --card: #fff;
+        --brand: #146eff;
+        --brand-dark: #0e52bf;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 15% 0%, #e8efff 0, transparent 35%),
+          radial-gradient(circle at 85% 0%, #dff4ff 0, transparent 30%),
+          var(--bg);
+      }
+      .wrap { max-width: 520px; margin: 40px auto; padding: 0 16px; }
+      .top a { color: #146eff; text-decoration: none; font-weight: 600; }
+      .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-top: 12px; }
+      h1 { margin: 0 0 8px; }
+      p { margin: 0 0 14px; color: var(--muted); }
+      label { display: block; margin-bottom: 5px; color: var(--muted); font-size: 0.9rem; }
+      input, button { width: 100%; border-radius: 8px; font-size: 0.95rem; }
+      input { border: 1px solid var(--line); padding: 9px 10px; margin-bottom: 10px; }
+      button { border: 0; padding: 10px 12px; background: var(--brand); color: #fff; font-weight: 600; cursor: pointer; }
+      button:hover { background: var(--brand-dark); }
+      .status { margin-top: 10px; padding: 9px 10px; border-radius: 8px; display: none; white-space: pre-wrap; }
+      .status.ok { display: block; background: #edf9f1; border: 1px solid #b6e2c4; color: #107a36; }
+      .status.err { display: block; background: #fff1f1; border: 1px solid #f1c0c0; color: #b42318; }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <nav class="top">
+        <a href="/">Home</a>
+      </nav>
+
+      <section class="card">
+        <h1>Admin Login</h1>
+        <p>Sign in with your admin email and password.</p>
+
+        <form id="loginForm">
+          <label for="email">Email</label>
+          <input id="email" type="email" autocomplete="username" required />
+
+          <label for="password">Password</label>
+          <input id="password" type="password" autocomplete="current-password" required />
+
+          <button type="submit" id="submitBtn">Sign In</button>
+        </form>
+
+        <div id="status" class="status"></div>
+      </section>
+    </main>
+
+    <script>
+      const form = document.getElementById("loginForm");
+      const submitBtn = document.getElementById("submitBtn");
+      const statusEl = document.getElementById("status");
+      const nextParam = new URLSearchParams(window.location.search).get("next");
+      const nextPath = nextParam && nextParam.startsWith("/") ? nextParam : "/admin.html";
+
+      function setStatus(type, message) {
+        statusEl.className = `status ${type}`;
+        statusEl.textContent = message;
+      }
+
+      async function checkExistingSession() {
+        const response = await fetch("/api/auth/me", {
+          method: "GET",
+          credentials: "same-origin"
+        });
+
+        if (response.ok) {
+          window.location.href = nextPath;
+        }
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        submitBtn.disabled = true;
+
+        const payload = {
+          email: document.getElementById("email").value.trim(),
+          password: document.getElementById("password").value
+        };
+
+        try {
+          const response = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify(payload)
+          });
+
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(data.error || "Login failed");
+          }
+
+          setStatus("ok", "Login successful. Redirecting...");
+          window.location.href = nextPath;
+        } catch (error) {
+          setStatus("err", `Failed: ${error.message}`);
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+
+      checkExistingSession();
+    </script>
+  </body>
+</html>

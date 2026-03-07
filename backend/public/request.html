@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Request Funds</title>
+    <style>
+      body { margin: 0; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; background: #f4f7ff; color: #1f2942; }
+      .wrap { max-width: 980px; margin: 30px auto; padding: 0 16px; }
+      .top a { margin-right: 10px; color: #146eff; text-decoration: none; font-weight: 600; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+      .card { background: #fff; border: 1px solid #dbe2f5; border-radius: 14px; padding: 16px; }
+      h1, h2 { margin-top: 0; }
+      label { display: block; margin-bottom: 4px; color: #66708f; font-size: 0.9rem; }
+      input, textarea, button { width: 100%; border-radius: 8px; font-size: 0.95rem; }
+      input, textarea { border: 1px solid #dbe2f5; padding: 9px 10px; margin-bottom: 10px; }
+      textarea { min-height: 70px; resize: vertical; }
+      button { border: 0; padding: 10px 12px; background: #146eff; color: #fff; font-weight: 600; cursor: pointer; }
+      button.secondary { background: #4a587c; }
+      .status { margin-top: 10px; padding: 9px 10px; border-radius: 8px; display: none; white-space: pre-wrap; }
+      .status.ok { display: block; background: #edf9f1; border: 1px solid #b6e2c4; color: #107a36; }
+      .status.err { display: block; background: #fff1f1; border: 1px solid #f1c0c0; color: #b42318; }
+      .list { display: grid; gap: 10px; }
+      .item { border: 1px solid #dbe2f5; border-radius: 10px; padding: 10px; }
+      .meta { color: #66708f; font-size: 0.88rem; }
+      .kv { margin-bottom: 6px; }
+      .hidden { display: none; }
+      @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <nav class="top">
+        <a href="/">Home</a>
+        <a href="/donations.html">Donations</a>
+        <a href="/login.html?next=/admin.html">Admin</a>
+        <a href="/user-auth.html?next=/request.html">User Auth</a>
+      </nav>
+
+      <div class="grid">
+        <section class="card">
+          <h1>Request Funds</h1>
+          <div id="authNotice" class="meta">Checking login status...</div>
+          <div id="profile" class="hidden">
+            <div class="kv"><strong>Email:</strong> <span id="profileEmail"></span></div>
+            <div class="kv"><strong>Pointer:</strong> <span id="profilePointer"></span></div>
+            <div class="kv"><strong>Key ID:</strong> <span id="profileKeyId"></span></div>
+            <div class="kv"><strong>Household Size:</strong> <span id="profileHousehold"></span></div>
+            <div class="kv"><strong>Per Capita Income (SGD):</strong> <span id="profileIncome"></span></div>
+            <div style="margin: 8px 0 12px;">
+              <button id="logoutBtn" class="secondary" type="button">Logout</button>
+            </div>
+          </div>
+
+          <form id="requestForm">
+            <label for="requesterName">Display name (optional)</label>
+            <input id="requesterName" placeholder="Defaults to your email" />
+
+            <label for="amount">Amount requested (minor units)</label>
+            <input id="amount" type="number" min="1" step="1" value="100" required />
+
+            <label for="note">Reason / note</label>
+            <textarea id="note" placeholder="What do you need this for?"></textarea>
+
+            <button type="submit" id="submitBtn">Create Request</button>
+          </form>
+          <div id="status" class="status"></div>
+        </section>
+
+        <section class="card">
+          <h2>Open Requests</h2>
+          <div id="requests" class="list"></div>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const form = document.getElementById("requestForm");
+      const statusEl = document.getElementById("status");
+      const submitBtn = document.getElementById("submitBtn");
+      const requestsEl = document.getElementById("requests");
+      const authNoticeEl = document.getElementById("authNotice");
+      const profileEl = document.getElementById("profile");
+      const logoutBtn = document.getElementById("logoutBtn");
+      let currentUser = null;
+
+      function setStatus(type, msg) {
+        statusEl.className = `status ${type}`;
+        statusEl.textContent = msg;
+      }
+
+      async function ensureUser() {
+        const response = await fetch("/api/users/me", {
+          method: "GET",
+          credentials: "same-origin"
+        });
+
+        if (response.status === 401) {
+          const next = encodeURIComponent("/request.html");
+          window.location.href = `/user-auth.html?next=${next}`;
+          return null;
+        }
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to verify login");
+        }
+
+        currentUser = data.user;
+        authNoticeEl.textContent = "Logged in";
+        profileEl.classList.remove("hidden");
+        document.getElementById("profileEmail").textContent = data.user.email;
+        document.getElementById("profilePointer").textContent = data.user.pointer;
+        document.getElementById("profileKeyId").textContent = data.user.keyId;
+        document.getElementById("profileHousehold").textContent = data.user.householdSize;
+        document.getElementById("profileIncome").textContent = data.user.perCapitaIncomeSgd;
+        return data.user;
+      }
+
+      logoutBtn.addEventListener("click", async () => {
+        try {
+          await fetch("/api/users/logout", {
+            method: "POST",
+            credentials: "same-origin"
+          });
+        } finally {
+          const next = encodeURIComponent("/request.html");
+          window.location.href = `/user-auth.html?next=${next}`;
+        }
+      });
+
+      async function loadRequests() {
+        const response = await fetch("/api/requests?status=open");
+        const data = await response.json();
+
+        if (!response.ok) {
+          requestsEl.innerHTML = `<div class="item">Failed to load requests</div>`;
+          return;
+        }
+
+        if (!data.length) {
+          requestsEl.innerHTML = `<div class="item">No open requests.</div>`;
+          return;
+        }
+
+        requestsEl.innerHTML = data.map((r) => `
+          <div class="item">
+            <div><strong>${r.requesterName}</strong></div>
+            <div class="meta">Request ID: ${r.requestId}</div>
+            <div class="meta">Amount: ${r.amount} (minor units)</div>
+            <div class="meta">Auto Review: ${r.autoReviewStatus || "pending"}</div>
+            <div class="meta">${r.note || "No note"}</div>
+          </div>
+        `).join("");
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        submitBtn.disabled = true;
+
+        const payload = {
+          requesterName: document.getElementById("requesterName").value.trim(),
+          amount: document.getElementById("amount").value.trim(),
+          note: document.getElementById("note").value.trim()
+        };
+
+        try {
+          const response = await fetch("/api/requests", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify(payload)
+          });
+
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || "Create request failed");
+          }
+
+          const redirectHint = data.payoutRedirectUrl
+            ? `\nPayout consent URL: ${data.payoutRedirectUrl}`
+            : "";
+          const autoHint = data.autoReviewReason
+            ? `\nAuto review: ${data.autoReviewReason}`
+            : "";
+
+          setStatus("ok", `Request created.\nRequest ID: ${data.requestId}${autoHint}${redirectHint}`);
+          form.reset();
+          document.getElementById("amount").value = "100";
+          await loadRequests();
+        } catch (error) {
+          setStatus("err", `Failed: ${error.message}`);
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+
+      (async () => {
+        try {
+          await ensureUser();
+          await loadRequests();
+        } catch (error) {
+          setStatus("err", `Failed: ${error.message}`);
+        }
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Donations</title>
+    <style>
+      :root {
+        --bg: #f4f7ff;
+        --card: #fff;
+        --ink: #1f2942;
+        --muted: #66708f;
+        --line: #dbe2f5;
+        --brand: #146eff;
+        --brand-dark: #0c50bc;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        color: var(--ink);
+        background: radial-gradient(circle at 10% 0%, #e8efff 0, transparent 35%), var(--bg);
+      }
+      .wrap { max-width: 980px; margin: 32px auto; padding: 0 16px; }
+      .topbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+      .topbar a { text-decoration: none; color: var(--brand); font-weight: 600; }
+      .grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 14px; }
+      .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+      h1 { margin: 0 0 8px; }
+      p { margin: 0 0 10px; color: var(--muted); }
+      .fields { display: grid; gap: 10px; }
+      label { font-size: 0.9rem; color: var(--muted); display: block; margin-bottom: 4px; }
+      input, textarea, button { width: 100%; border-radius: 8px; font-size: 0.95rem; }
+      input, textarea { border: 1px solid var(--line); padding: 9px 10px; }
+      textarea { min-height: 72px; resize: vertical; font-family: Consolas, "Courier New", monospace; }
+      button { border: 0; padding: 10px 12px; color: #fff; background: var(--brand); font-weight: 600; cursor: pointer; }
+      button:hover { background: var(--brand-dark); }
+      .status { margin-top: 10px; border-radius: 8px; padding: 9px 10px; white-space: pre-wrap; display: none; }
+      .status.info { display: block; background: #eef3ff; border: 1px solid #cfdcff; color: #224e9f; }
+      .status.err { display: block; background: #fff1f1; border: 1px solid #f1cbcb; color: #b02020; }
+      .req-list { display: grid; gap: 10px; margin-top: 10px; }
+      .req-item { border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+      .req-title { font-weight: 700; margin-bottom: 4px; }
+      .req-meta { font-size: 0.85rem; color: var(--muted); margin-bottom: 8px; }
+      .small-btn { width: auto; padding: 7px 9px; font-size: 0.85rem; }
+      @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <nav class="topbar">
+        <a href="/">Home</a>
+        <a href="/request.html">Request Funds</a>
+        <a href="/admin.html">Admin</a>
+        <a href="/user-auth.html?next=/donations.html">User Auth</a>
+      </nav>
+
+      <div class="grid">
+        <section class="card">
+          <h1>Donate Funds</h1>
+          <p id="recipientLabel">Loading donation recipient...</p>
+
+          <div id="authNotice" style="color:#66708f;font-size:0.9rem;margin-bottom:8px;">Checking login status...</div>
+          <div id="profile" style="display:none;margin-bottom:12px;padding:10px;background:#f4f7ff;border-radius:10px;border:1px solid #dbe2f5;">
+            <div style="margin-bottom:4px;font-size:0.9rem;"><strong>Logged in as:</strong> <span id="profileEmail"></span></div>
+            <div style="margin-bottom:4px;font-size:0.9rem;"><strong>Wallet:</strong> <span id="profilePointer"></span></div>
+            <div style="margin-bottom:8px;font-size:0.9rem;"><strong>Key ID:</strong> <span id="profileKeyId"></span></div>
+            <button id="logoutBtn" type="button" style="width:auto;padding:6px 10px;font-size:0.85rem;background:#4a587c;">Logout</button>
+          </div>
+
+          <form id="donationForm" class="fields">
+            <div>
+              <label for="amount">Donation amount (minor units)</label>
+              <input id="amount" type="number" min="1" step="1" value="100" required />
+            </div>
+
+            <div>
+              <label for="requestId">Optional request ID to fund</label>
+              <input id="requestId" placeholder="Paste request ID from request page" />
+            </div>
+
+            <button id="donateBtn" type="submit">Start Donation</button>
+          </form>
+
+          <div id="status" class="status"></div>
+        </section>
+
+        <aside class="card">
+          <h2 style="margin-top:0;">Open Requests</h2>
+          <p>Pick a request and auto-fill amount + request ID.</p>
+          <div id="requests" class="req-list"></div>
+        </aside>
+      </div>
+    </main>
+
+    <script>
+      const form = document.getElementById("donationForm");
+      const donateBtn = document.getElementById("donateBtn");
+      const statusEl = document.getElementById("status");
+      const requestsEl = document.getElementById("requests");
+      const recipientLabel = document.getElementById("recipientLabel");
+      const authNoticeEl = document.getElementById("authNotice");
+      const profileEl = document.getElementById("profile");
+      const logoutBtn = document.getElementById("logoutBtn");
+      let currentUser = null;
+
+      function setStatus(type, text) {
+        statusEl.className = `status ${type}`;
+        statusEl.textContent = text;
+      }
+
+      async function ensureUser() {
+        const response = await fetch("/api/users/me", {
+          method: "GET",
+          credentials: "same-origin"
+        });
+
+        if (response.status === 401) {
+          const next = encodeURIComponent("/donations.html");
+          window.location.href = `/user-auth.html?next=${next}`;
+          return null;
+        }
+
+        const data = await response.json();
+        if (!response.ok) {
+          authNoticeEl.textContent = "Could not verify login.";
+          return null;
+        }
+
+        currentUser = data.user;
+        authNoticeEl.textContent = "";
+        profileEl.style.display = "block";
+        document.getElementById("profileEmail").textContent = data.user.email;
+        document.getElementById("profilePointer").textContent = data.user.pointer;
+        document.getElementById("profileKeyId").textContent = data.user.keyId;
+        return data.user;
+      }
+
+      logoutBtn.addEventListener("click", async () => {
+        try {
+          await fetch("/api/users/logout", {
+            method: "POST",
+            credentials: "same-origin"
+          });
+        } finally {
+          const next = encodeURIComponent("/donations.html");
+          window.location.href = `/user-auth.html?next=${next}`;
+        }
+      });
+
+      async function loadConfig() {
+        const response = await fetch("/api/config");
+        const data = await response.json();
+        if (!response.ok) {
+          recipientLabel.textContent = "Could not load donation config.";
+          return;
+        }
+
+        if (!data.donationRecipientConfigured) {
+          recipientLabel.textContent = "Donation recipient is not configured on backend.";
+          return;
+        }
+
+        recipientLabel.textContent = `Recipient wallet: ${data.donationRecipientWalletAddress}`;
+      }
+
+      async function loadRequests() {
+        const response = await fetch("/api/requests?status=open");
+        const data = await response.json();
+
+        if (!response.ok) {
+          requestsEl.innerHTML = `<div class="req-item">Failed to load requests: ${data.error || "unknown"}</div>`;
+          return;
+        }
+
+        if (!data.length) {
+          requestsEl.innerHTML = `<div class="req-item">No open requests yet.</div>`;
+          return;
+        }
+
+        requestsEl.innerHTML = data.map((item) => `
+          <div class="req-item">
+            <div class="req-title">${item.requesterName}</div>
+            <div class="req-meta">Request ID: ${item.requestId}</div>
+            <div class="req-meta">Amount: ${item.amount} (minor units)</div>
+            <div class="req-meta">${item.note || "No note"}</div>
+            <button class="small-btn" data-request-id="${item.requestId}" data-amount="${item.amount}">Use This Request</button>
+          </div>
+        `).join("");
+
+        requestsEl.querySelectorAll("button[data-request-id]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            document.getElementById("requestId").value = btn.dataset.requestId;
+            document.getElementById("amount").value = btn.dataset.amount;
+          });
+        });
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        if (!currentUser) {
+          setStatus("err", "You must be logged in to donate.");
+          return;
+        }
+
+        donateBtn.disabled = true;
+        setStatus("info", "Preparing donation and redirecting for consent...");
+
+        const payload = {
+          donorWalletAddress: currentUser.pointer,
+          amount: document.getElementById("amount").value.trim(),
+          requestId: document.getElementById("requestId").value.trim(),
+          keyId: currentUser.keyId,
+          privateKeyPath: currentUser.privateKey
+        };
+
+        try {
+          const response = await fetch("/api/donations/init", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify(payload)
+          });
+
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || "Donation init failed");
+          }
+
+          setStatus("info", "Redirecting donor to approve donation...");
+          window.location.assign(data.redirectUrl);
+        } catch (error) {
+          setStatus("err", `Failed: ${error.message}`);
+          donateBtn.disabled = false;
+        }
+      });
+
+      (async () => {
+        const user = await ensureUser();
+        if (!user) return;
+        await Promise.all([loadConfig(), loadRequests()]);
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Open Payments Community Portal</title>
+    <style>
+      :root {
+        --bg: #f4f7ff;
+        --ink: #1f2942;
+        --muted: #66708f;
+        --line: #dbe2f5;
+        --card: #fff;
+        --brand: #146eff;
+        --brand-dark: #0e52bf;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 12% 0%, #e8efff 0, transparent 35%),
+          radial-gradient(circle at 88% 0%, #dff4ff 0, transparent 30%),
+          var(--bg);
+      }
+      .wrap { max-width: 980px; margin: 34px auto; padding: 0 16px; }
+      h1 { margin: 0 0 8px; font-size: 2rem; }
+      .sub { margin: 0 0 16px; color: var(--muted); }
+      .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .card h2 { margin: 0; }
+      .card p { margin: 0; color: var(--muted); }
+      .card a {
+        margin-top: auto;
+        text-decoration: none;
+        display: inline-block;
+        width: fit-content;
+        background: var(--brand);
+        color: #fff;
+        border-radius: 9px;
+        padding: 8px 11px;
+        font-weight: 600;
+      }
+      .card a:hover { background: var(--brand-dark); }
+      .footer { margin-top: 20px; color: var(--muted); font-size: 0.9rem; }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-bottom: 22px;
+      }
+      .stat-card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .stat-label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+      .stat-value { font-size: 1.55rem; font-weight: 700; color: var(--ink); }
+      .stat-sub { font-size: 0.8rem; color: var(--muted); }
+      .stat-loading { opacity: 0.4; font-style: italic; }
+      @media (max-width: 920px) { .grid { grid-template-columns: 1fr; } .stats { grid-template-columns: repeat(2, 1fr); } }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <h1>Open Payments Community Portal</h1>
+      <p class="sub">Choose what you want to do.</p>
+
+      <section class="stats" id="statsBar">
+        <div class="stat-card">
+          <div class="stat-label">Total Funded</div>
+          <div class="stat-value stat-loading" id="statFunded">—</div>
+          <div class="stat-sub" id="statFundedSub">minor units disbursed</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Requests Funded</div>
+          <div class="stat-value stat-loading" id="statFundedCount">—</div>
+          <div class="stat-sub" id="statFundedCountSub">of <span id="statTotal">—</span> total requests</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Auto-Approved</div>
+          <div class="stat-value stat-loading" id="statAutoApproved">—</div>
+          <div class="stat-sub"><span id="statNeedy">—</span> needy bonus top-ups</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Registered Users</div>
+          <div class="stat-value stat-loading" id="statUsers">—</div>
+          <div class="stat-sub"><span id="statDonations">—</span> donations initiated</div>
+        </div>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>1. Sign In / Sign Up</h2>
+          <p>Create an account or log in. Required before donating or requesting funds.</p>
+          <a href="/user-auth.html">Get Started</a>
+        </article>
+
+        <article class="card">
+          <h2>2. Donations</h2>
+          <p>Logged-in users can send funds to a recipient wallet through an interactive consent flow.</p>
+          <a href="/donations.html">Go to Donations</a>
+        </article>
+
+        <article class="card">
+          <h2>3. Request Funds</h2>
+          <p>Logged-in users can create a funding request. Auto-review may approve and trigger payout.</p>
+          <a href="/request.html">Go to Request Page</a>
+        </article>
+
+        <article class="card">
+          <h2>4. Admin</h2>
+          <p>Admins can sign in with email/password to review requests and monitor donation stats.</p>
+          <a href="/login.html?next=/admin.html">Go to Admin</a>
+        </article>
+      </section>
+
+      <p class="footer">All flows run against the backend Open Payments integration on this localhost app.</p>
+    </main>
+
+    <script>
+      async function loadMetrics() {
+        try {
+          const res = await fetch('/api/metrics')
+          if (!res.ok) return
+          const m = await res.json()
+
+          function setText(id, text) {
+            const el = document.getElementById(id)
+            if (!el) return
+            el.textContent = text
+            el.classList.remove('stat-loading')
+          }
+
+          // Format minor units — show as decimal if asset scale known, else raw integer
+          function fmtUnits(value, assetCode, assetScale) {
+            if (!assetCode || !Number.isInteger(assetScale) || assetScale === 0) {
+              return value.toLocaleString()
+            }
+            const s = String(value).padStart(assetScale + 1, '0')
+            const whole = s.slice(0, s.length - assetScale)
+            const frac = s.slice(s.length - assetScale)
+            return `${Number(whole).toLocaleString()}.${frac} ${assetCode}`
+          }
+
+          setText('statFunded', m.totalAmountFunded.toLocaleString())
+          setText('statFundedSub', `minor units disbursed${m.totalBonusAwarded > 0 ? ` (incl. ${m.totalBonusAwarded.toLocaleString()} bonus)` : ''}`)
+          setText('statFundedCount', m.requestsByStatus.funded)
+          setText('statTotal', m.totalRequests)
+          setText('statAutoApproved', m.autoApprovedCount)
+          setText('statNeedy', m.needyBonusCount)
+          setText('statUsers', m.totalUsers)
+          setText('statDonations', m.totalDonations)
+        } catch {
+          // Metrics are non-critical; fail silently
+        }
+      }
+
+      loadMetrics()
+    </script>
+  </body>
+</html>

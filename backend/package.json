@@ -1,0 +1,20 @@
+{
+  "name": "op-transfer-demo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Local Open Payments transfer demo",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@interledger/open-payments": "latest",
+    "axios": "^1.13.6",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2"
+  }
+}

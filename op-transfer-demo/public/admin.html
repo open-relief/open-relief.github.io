@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin</title>
+    <style>
+      body { margin: 0; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; background: #f4f7ff; color: #1f2942; }
+      .wrap { max-width: 1080px; margin: 30px auto; padding: 0 16px; }
+      .top a { margin-right: 10px; color: #146eff; text-decoration: none; font-weight: 600; }
+      .card { background: #fff; border: 1px solid #dbe2f5; border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+      h1, h2 { margin-top: 0; }
+      label { display: block; margin-bottom: 4px; color: #66708f; font-size: 0.9rem; }
+      input, select, button { border-radius: 8px; font-size: 0.95rem; }
+      input, select { border: 1px solid #dbe2f5; padding: 8px 9px; }
+      button { border: 0; padding: 9px 11px; background: #146eff; color: #fff; font-weight: 600; cursor: pointer; }
+      .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; }
+      .status { margin-top: 10px; padding: 8px 10px; border-radius: 8px; display: none; white-space: pre-wrap; }
+      .status.ok { display: block; background: #edf9f1; border: 1px solid #b6e2c4; color: #107a36; }
+      .status.err { display: block; background: #fff1f1; border: 1px solid #f1c0c0; color: #b42318; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { border-bottom: 1px solid #e5eafa; text-align: left; padding: 8px 6px; font-size: 0.9rem; vertical-align: top; }
+      .muted { color: #66708f; font-size: 0.85rem; }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <nav class="top">
+        <a href="/">Home</a>
+        <a href="/donations.html">Donations</a>
+        <a href="/request.html">Request Funds</a>
+      </nav>
+
+      <section class="card">
+        <h1>Admin Panel</h1>
+        <div class="row">
+          <div>
+            <label>Signed in as</label>
+            <div id="adminIdentity" class="muted">Checking session...</div>
+          </div>
+          <button id="loadBtn">Refresh Data</button>
+          <button id="runAgentBtn" style="background:#1b7a57;">Run Auto Agent</button>
+          <button id="logoutBtn" style="background:#4a587c;">Logout</button>
+        </div>
+        <div id="status" class="status"></div>
+      </section>
+
+      <section class="card">
+        <h2>Overview</h2>
+        <pre id="overview" class="muted">Load data to view overview.</pre>
+      </section>
+
+      <section class="card">
+        <h2>Fund Requests</h2>
+        <div style="overflow:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Requester</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Auto Review</th>
+                <th>Payout</th>
+                <th>Admin Note</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const loadBtn = document.getElementById("loadBtn");
+      const runAgentBtn = document.getElementById("runAgentBtn");
+      const logoutBtn = document.getElementById("logoutBtn");
+      const statusEl = document.getElementById("status");
+      const overviewEl = document.getElementById("overview");
+      const rowsEl = document.getElementById("rows");
+      const adminIdentityEl = document.getElementById("adminIdentity");
+
+      function setStatus(type, msg) {
+        statusEl.className = `status ${type}`;
+        statusEl.textContent = msg;
+      }
+
+      async function fetchAdmin(path, options = {}) {
+        const headers = Object.assign({}, options.headers || {});
+
+        const response = await fetch(path, Object.assign({}, options, {
+          headers,
+          credentials: "same-origin"
+        }));
+
+        const data = await response.json().catch(() => ({}));
+
+        if (response.status === 401) {
+          const next = encodeURIComponent("/admin.html");
+          window.location.href = `/login.html?next=${next}`;
+          throw new Error("Session expired. Redirecting to login...");
+        }
+
+        if (!response.ok) {
+          throw new Error(data.error || "Admin request failed");
+        }
+
+        return data;
+      }
+
+      async function loadAll() {
+        const [overview, requests] = await Promise.all([
+          fetchAdmin("/api/admin/overview"),
+          fetchAdmin("/api/admin/requests")
+        ]);
+
+        overviewEl.textContent = JSON.stringify(overview, null, 2);
+
+        if (!requests.length) {
+          rowsEl.innerHTML = `<tr><td colspan="8">No requests.</td></tr>`;
+          return;
+        }
+
+        rowsEl.innerHTML = requests.map((r) => `
+          <tr>
+            <td><span class="muted">${r.requestId}</span></td>
+            <td>${r.requesterName}<div class="muted">${r.requesterWalletAddress || "no wallet"}</div></td>
+            <td>${r.amount}</td>
+            <td>
+              <select data-id="${r.requestId}" data-field="status">
+                ${["open", "approved", "rejected", "funded"].map((s) => `<option value="${s}" ${s === r.status ? "selected" : ""}>${s}</option>`).join("")}
+              </select>
+            </td>
+            <td>
+              <div class="muted">${r.autoReviewStatus || "pending"}</div>
+              <div class="muted">${r.autoReviewReason || ""}</div>
+            </td>
+            <td>
+              <div class="muted">${r.payoutStatus || "none"}</div>
+              <div class="muted">${r.payoutTransferId || ""}</div>
+              ${r.payoutRedirectUrl ? `<div><a href="${r.payoutRedirectUrl}" target="_blank" rel="noopener">Consent Link</a></div>` : ""}
+            </td>
+            <td>
+              <input data-id="${r.requestId}" data-field="note" value="${(r.adminNote || "").replace(/"/g, "&quot;")}" />
+            </td>
+            <td><button data-save-id="${r.requestId}">Save</button></td>
+          </tr>
+        `).join("");
+
+        rowsEl.querySelectorAll("button[data-save-id]").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const id = btn.dataset.saveId;
+            const status = rowsEl.querySelector(`select[data-id='${id}'][data-field='status']`).value;
+            const adminNote = rowsEl.querySelector(`input[data-id='${id}'][data-field='note']`).value;
+
+            try {
+              const result = await fetchAdmin(`/api/admin/requests/${id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status, adminNote })
+              });
+
+              const payoutMsg = result.autoPayoutTriggered
+                ? `\nAuto payout started: ${result.autoPayoutTransferId || "(transfer id unavailable)"}`
+                : "";
+              setStatus("ok", `Updated request ${id}${payoutMsg}`);
+
+              if (result.requiresConsent && result.redirectUrl) {
+                setStatus("ok", `Updated request ${id}${payoutMsg}\nRedirecting to Shawn consent page...`);
+                window.location.href = result.redirectUrl;
+                return;
+              }
+
+              await loadAll();
+            } catch (error) {
+              setStatus("err", `Failed to update ${id}: ${error.message}`);
+            }
+          });
+        });
+      }
+
+      async function ensureAuthenticated() {
+        const response = await fetch("/api/auth/me", {
+          method: "GET",
+          credentials: "same-origin"
+        });
+
+        if (response.status === 401) {
+          const next = encodeURIComponent("/admin.html");
+          window.location.href = `/login.html?next=${next}`;
+          return null;
+        }
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to verify login");
+        }
+
+        adminIdentityEl.textContent = data.user?.email || "admin";
+        return data;
+      }
+
+      logoutBtn.addEventListener("click", async () => {
+        try {
+          await fetch("/api/auth/logout", {
+            method: "POST",
+            credentials: "same-origin"
+          });
+        } finally {
+          const next = encodeURIComponent("/admin.html");
+          window.location.href = `/login.html?next=${next}`;
+        }
+      });
+
+      runAgentBtn.addEventListener("click", async () => {
+        try {
+          setStatus("ok", "Running auto-approval agent...");
+          const result = await fetchAdmin("/api/admin/agent/run", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({})
+          });
+
+          setStatus("ok", `Agent run complete. Processed: ${result.processed || 0}`);
+          await loadAll();
+        } catch (error) {
+          setStatus("err", `Agent run failed: ${error.message}`);
+        }
+      });
+
+      loadBtn.addEventListener("click", async () => {
+        try {
+          setStatus("ok", "Loading admin data...");
+          await loadAll();
+          setStatus("ok", "Admin data loaded.");
+        } catch (error) {
+          setStatus("err", `Failed: ${error.message}`);
+        }
+      });
+
+      (async () => {
+        try {
+          const auth = await ensureAuthenticated();
+          if (!auth) {
+            return;
+          }
+
+          setStatus("ok", "Loading admin data...");
+          await loadAll();
+          setStatus("ok", "Admin data loaded.");
+        } catch (error) {
+          setStatus("err", `Failed: ${error.message}`);
+        }
+      })();
+    </script>
+  </body>
+</html>

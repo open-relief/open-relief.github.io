@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>User Signup and Login</title>
+    <style>
+      :root {
+        --bg: #f4f7ff;
+        --ink: #1f2942;
+        --muted: #66708f;
+        --line: #dbe2f5;
+        --card: #fff;
+        --brand: #146eff;
+        --brand-dark: #0e52bf;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 14% 0%, #e8efff 0, transparent 35%),
+          radial-gradient(circle at 86% 0%, #dff4ff 0, transparent 30%),
+          var(--bg);
+      }
+      .wrap { max-width: 1040px; margin: 30px auto; padding: 0 16px; }
+      .top a { margin-right: 10px; color: #146eff; text-decoration: none; font-weight: 600; }
+      .grid { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 14px; margin-top: 12px; }
+      .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+      h1, h2 { margin-top: 0; }
+      p { color: var(--muted); }
+      label { display: block; margin-bottom: 4px; color: var(--muted); font-size: 0.9rem; }
+      input, textarea, button { width: 100%; border-radius: 8px; font-size: 0.95rem; }
+      input, textarea { border: 1px solid var(--line); padding: 9px 10px; margin-bottom: 10px; }
+      textarea { min-height: 120px; resize: vertical; }
+      button { border: 0; padding: 10px 12px; background: var(--brand); color: #fff; font-weight: 600; cursor: pointer; }
+      button:hover { background: var(--brand-dark); }
+      .status { margin-top: 10px; padding: 9px 10px; border-radius: 8px; display: none; white-space: pre-wrap; }
+      .status.ok { display: block; background: #edf9f1; border: 1px solid #b6e2c4; color: #107a36; }
+      .status.err { display: block; background: #fff1f1; border: 1px solid #f1c0c0; color: #b42318; }
+      @media (max-width: 920px) { .grid { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <nav class="top">
+        <a href="/">Home</a>
+        <a href="/request.html">Request Funds</a>
+      </nav>
+
+      <h1>User Signup and Login</h1>
+      <p>Create a user profile with financial context for auto-review, then log in with email and password.</p>
+
+      <div class="grid">
+        <section class="card">
+          <h2>Sign Up</h2>
+          <form id="signupForm">
+            <label for="signupEmail">Email</label>
+            <input id="signupEmail" type="email" required />
+
+            <label for="signupPassword">Password</label>
+            <input id="signupPassword" type="password" minlength="8" required />
+
+            <label for="signupPointer">Pointer (wallet URL)</label>
+            <input id="signupPointer" placeholder="https://ilp.interledger-test.dev/yourname" required />
+
+            <label for="signupKeyId">Key ID</label>
+            <input id="signupKeyId" required />
+
+            <label for="signupPrivateKey">Private Key</label>
+            <textarea id="signupPrivateKey" placeholder="PEM / base64 / PRIV..." required></textarea>
+
+            <label for="signupHouseholdSize">Household Size</label>
+            <input id="signupHouseholdSize" type="number" min="1" step="1" required />
+
+            <label for="signupPerCapitaIncome">Per Capita Income (SGD)</label>
+            <input id="signupPerCapitaIncome" type="number" min="1" step="0.01" required />
+
+            <button id="signupBtn" type="submit">Create Account</button>
+          </form>
+          <div id="signupStatus" class="status"></div>
+        </section>
+
+        <section class="card">
+          <h2>Login</h2>
+          <form id="loginForm">
+            <label for="loginEmail">Email</label>
+            <input id="loginEmail" type="email" required />
+
+            <label for="loginPassword">Password</label>
+            <input id="loginPassword" type="password" required />
+
+            <button id="loginBtn" type="submit">Login</button>
+          </form>
+          <div id="loginStatus" class="status"></div>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const signupForm = document.getElementById("signupForm");
+      const loginForm = document.getElementById("loginForm");
+      const signupStatus = document.getElementById("signupStatus");
+      const loginStatus = document.getElementById("loginStatus");
+      const nextParam = new URLSearchParams(window.location.search).get("next");
+      const nextPath = nextParam && nextParam.startsWith("/") ? nextParam : "/request.html";
+
+      function setStatus(el, type, message) {
+        el.className = `status ${type}`;
+        el.textContent = message;
+      }
+
+      async function checkExistingSession() {
+        const response = await fetch("/api/users/me", {
+          method: "GET",
+          credentials: "same-origin"
+        });
+
+        if (response.ok) {
+          window.location.href = nextPath;
+        }
+      }
+
+      signupForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const signupBtn = document.getElementById("signupBtn");
+        signupBtn.disabled = true;
+
+        const payload = {
+          email: document.getElementById("signupEmail").value.trim(),
+          password: document.getElementById("signupPassword").value,
+          pointer: document.getElementById("signupPointer").value.trim(),
+          keyId: document.getElementById("signupKeyId").value.trim(),
+          privateKey: document.getElementById("signupPrivateKey").value.trim(),
+          householdSize: document.getElementById("signupHouseholdSize").value.trim(),
+          perCapitaIncomeSgd: document.getElementById("signupPerCapitaIncome").value.trim()
+        };
+
+        try {
+          const response = await fetch("/api/users/signup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify(payload)
+          });
+
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(data.error || "Signup failed");
+          }
+
+          setStatus(signupStatus, "ok", "Signup successful. You can now log in.");
+          document.getElementById("loginEmail").value = payload.email;
+        } catch (error) {
+          setStatus(signupStatus, "err", `Failed: ${error.message}`);
+        } finally {
+          signupBtn.disabled = false;
+        }
+      });
+
+      loginForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const loginBtn = document.getElementById("loginBtn");
+        loginBtn.disabled = true;
+
+        const payload = {
+          email: document.getElementById("loginEmail").value.trim(),
+          password: document.getElementById("loginPassword").value
+        };
+
+        try {
+          const response = await fetch("/api/users/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify(payload)
+          });
+
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(data.error || "Login failed");
+          }
+
+          setStatus(loginStatus, "ok", "Login successful. Redirecting...");
+          window.location.href = nextPath;
+        } catch (error) {
+          setStatus(loginStatus, "err", `Failed: ${error.message}`);
+        } finally {
+          loginBtn.disabled = false;
+        }
+      });
+
+      checkExistingSession();
+    </script>
+  </body>
+</html>
