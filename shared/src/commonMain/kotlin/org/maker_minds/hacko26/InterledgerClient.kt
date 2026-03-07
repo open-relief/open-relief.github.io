@@ -27,6 +27,22 @@ data class StreamPaymentResponse(
     val message: String? = null
 )
 
+@Serializable
+private data class PaymentPointerResolutionResponse(
+    @SerialName("destination_account")
+    val destinationAccount: String,
+    @SerialName("shared_secret")
+    val sharedSecret: String
+)
+
+data class ResolvedPaymentEndpoint(
+    val destinationAccount: String,
+    val sharedSecret: String
+)
+
+class PaymentPointerResolutionException(message: String, cause: Throwable? = null) :
+    IllegalStateException(message, cause)
+
 class InterledgerClient(
     private val streamSenderEndpoint: String = "http://localhost:3000/stream/send"
 ) {
@@ -66,6 +82,50 @@ class InterledgerClient(
         } else {
             throw IllegalStateException(response.bodyAsText())
         }
+    }
+
+    /**
+     * Resolves an Interledger payment pointer into its SPSP/Open Payments details.
+     */
+    suspend fun resolvePaymentPointer(paymentPointer: String): ResolvedPaymentEndpoint {
+        val endpointUrl = derivePaymentPointerEndpoint(paymentPointer)
+
+        val response = client.get(endpointUrl) {
+            header(HttpHeaders.Accept, "application/spsp4+json, application/monetization+json")
+        }
+
+        if (!response.status.isSuccess()) {
+            throw PaymentPointerResolutionException(
+                "Failed to resolve payment pointer. HTTP ${response.status.value}: ${response.bodyAsText()}"
+            )
+        }
+
+        return runCatching {
+            val body = response.body<PaymentPointerResolutionResponse>()
+            ResolvedPaymentEndpoint(
+                destinationAccount = body.destinationAccount,
+                sharedSecret = body.sharedSecret
+            )
+        }.getOrElse { error ->
+            throw PaymentPointerResolutionException(
+                "Invalid SPSP/Open Payments response for endpoint: $endpointUrl",
+                error
+            )
+        }
+    }
+
+    internal fun derivePaymentPointerEndpoint(paymentPointer: String): String {
+        val normalizedPointer = paymentPointer.trim()
+        require(normalizedPointer.startsWith("$")) {
+            "Payment pointer must start with '$'"
+        }
+
+        val path = normalizedPointer.removePrefix("$")
+        require(path.isNotBlank()) {
+            "Payment pointer cannot be empty"
+        }
+
+        return "https://$path"
     }
 }
 
