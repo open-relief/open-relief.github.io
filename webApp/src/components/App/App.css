@@ -4,24 +4,27 @@
   justify-content: center;
   background: linear-gradient(160deg, #f4f7ff 0%, #eef2ff 45%, #f9fbff 100%);
   padding: 24px;
-  font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+  font-family: Inter, 'Segoe UI', Roboto, Arial, sans-serif;
 }
 
 .portal {
-  width: min(980px, 100%);
+  width: min(1000px, 100%);
   display: grid;
   gap: 16px;
 }
 
-.portal-header {
+.portal-header,
+.panel {
   background: #ffffff;
   border: 1px solid #d9e2ff;
   border-radius: 16px;
   box-shadow: 0 20px 40px rgba(43, 76, 203, 0.08);
-  padding: 20px 24px;
+  padding: 24px;
 }
 
-.portal-header h1 {
+.portal-header h1,
+.panel h2,
+.panel h3 {
   margin: 0;
   color: #162447;
 }
@@ -37,78 +40,12 @@
   gap: 10px;
 }
 
-.top-nav button {
-  border: 1px solid #c7d4ff;
-  border-radius: 999px;
-  background: #f7f9ff;
-  color: #2b3d76;
-  padding: 8px 14px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.top-nav button.active {
-  border-color: #2d6bff;
-  background: #2d6bff;
-  color: #ffffff;
-}
-
-.panel {
-  background: #ffffff;
-  border: 1px solid #d9e2ff;
-  border-radius: 16px;
-  box-shadow: 0 20px 40px rgba(43, 76, 203, 0.08);
-  padding: 24px;
-  display: grid;
-  gap: 14px;
-}
-
-.panel h2,
-.panel h3 {
-  margin: 0;
-  color: #162447;
-}
-
-.subtitle {
-  margin: 0;
-  color: #4b5c88;
-}
-
-.grid-panel {
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-}
-
-.info-card {
-  border: 1px solid #dde6ff;
-  border-radius: 12px;
-  padding: 14px;
-  background: #fbfcff;
-}
-
-.info-card h2 {
-  margin: 0 0 8px;
-  font-size: 1.05rem;
-}
-
-.info-card p {
-  margin: 0;
-  color: #4b5c88;
-}
-
-.metrics-list {
-  margin: 0;
-  padding-left: 18px;
-  color: #30477d;
-  display: grid;
-  gap: 5px;
-}
-
 .form-grid {
   display: grid;
   gap: 12px;
 }
 
-label {
+.field {
   display: grid;
   gap: 6px;
   font-weight: 600;
@@ -116,63 +53,48 @@ label {
 }
 
 input,
-textarea {
+textarea,
+select,
+table {
+  font-family: inherit;
+}
+
+input,
+textarea,
+select {
   border: 1px solid #c6d3ff;
   border-radius: 10px;
   padding: 10px 12px;
   font-size: 0.95rem;
-  font-family: inherit;
-}
-
-input:focus,
-textarea:focus {
-  outline: 2px solid #9bb2ff;
-  border-color: #9bb2ff;
 }
 
 button {
-  margin-top: 4px;
   border: none;
   border-radius: 10px;
   padding: 11px 14px;
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 600;
   color: #ffffff;
   background: #2d6bff;
   cursor: pointer;
 }
 
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.7;
+button.secondary {
+  background: #6073a3;
+}
+
+button.active {
+  background: #1e4fd0;
 }
 
 button.danger {
   background: #b42318;
 }
 
-.status {
-  margin: 6px 0 0;
-  line-height: 1.4;
-  word-break: break-word;
-}
-
-.status.success {
-  color: #1b7a2a;
-}
-
-.status.error {
-  color: #b42318;
-}
-
-.status.idle {
-  color: #4b5c88;
-}
-
-.request-id {
-  margin: 4px 0 0;
-  font-weight: 700;
-  color: #1e3a8a;
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .request-card {
@@ -182,15 +104,19 @@ button.danger {
   background: #fcfdff;
 }
 
-.request-card h3,
-.request-card h4 {
-  margin: 0 0 6px;
-  color: #1f3773;
+.metrics-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
 }
 
-.request-card p {
-  margin: 4px 0;
-  color: #3b4f84;
+.status.idle {
+  color: #4b5c88;
+}
+
+.status.error {
+  color: #b42318;
 }
 
 .badge {
@@ -200,11 +126,6 @@ button.danger {
   padding: 3px 8px;
   border-radius: 999px;
   font-weight: 700;
-}
-
-.badge.pending {
-  background: #fff4d6;
-  color: #8f5f00;
 }
 
 .badge.approved {
@@ -217,34 +138,17 @@ button.danger {
   color: #962d2d;
 }
 
-.badge.paid {
-  background: #dbeafe;
-  color: #1d4ed8;
+table {
+  width: 100%;
+  border-collapse: collapse;
 }
 
-.row-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 8px;
-}
-
-.admin-login {
-  width: min(380px, 100%);
-  display: grid;
-  gap: 10px;
-}
-
-pre {
-  white-space: pre-wrap;
-  word-break: break-word;
-  background: #f5f8ff;
-  border: 1px solid #d8e3ff;
-  border-radius: 8px;
-  padding: 10px;
-  margin: 8px 0 0;
-  font-size: 0.8rem;
-  color: #233a72;
+th,
+td {
+  border: 1px solid #dbe4ff;
+  text-align: left;
+  padding: 8px;
+  vertical-align: top;
 }
 
 @media (max-width: 640px) {
@@ -252,8 +156,8 @@ pre {
     padding: 12px;
   }
 
-  .panel,
-  .portal-header {
+  .portal-header,
+  .panel {
     padding: 16px;
   }
 }
