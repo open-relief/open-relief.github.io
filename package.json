@@ -7,7 +7,8 @@
     "shared/build/dist/js/developmentLibrary"
   ],
   "scripts": {
-    "build": "cd webApp && npm run build",
-    "start": "cd webApp && npm run start"
+    // top‑level helpers that just forward to the webApp workspace
+    "build": "npm --prefix webApp run build",
+    "start": "npm --prefix webApp run start"
   }
 }

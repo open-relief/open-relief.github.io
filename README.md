@@ -34,7 +34,7 @@ in your IDE’s toolbar or build it directly from the terminal:
 To build and run the development version of the web app, use the run configuration from the run widget
 in your IDE’s toolbar or run it directly from the terminal:
 1. Install [Node.js](https://nodejs.org/en/download) (which includes `npm`)
-2. Build Kotlin/JS shared code:
+2. (Optional) you can build the Kotlin/JS shared code yourself, but the `webApp` npm scripts now do it automatically.
    - on macOS/Linux
      ```shell
      ./gradlew :shared:jsBrowserDevelopmentLibraryDistribution
@@ -45,9 +45,14 @@ in your IDE’s toolbar or run it directly from the terminal:
      ```
 3. Build and run the web application
    ```shell
+   # install dependencies (workspace will link the shared package)
    npm install
+
+   # the `npm start` script runs Gradle first and then launches the Vite dev server
    npm run start
    ```
+
+   A production bundle can be produced with `npm run build` (again the Gradle task is invoked automatically).
 
 ---
 

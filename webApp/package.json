@@ -4,8 +4,12 @@
   "description": "Web application that uses Kotlin Multiplatform Library",
   "type": "module",
   "scripts": {
-    "build": "./gradlew jsBrowserProductionLibraryDistribution && cd webApp && npm run build",
-    "start": "vite"
+    // build the Kotlin/JS shared library first, then let Vite produce the static bundle
+    "prestart": "../gradlew :shared:jsBrowserDevelopmentLibraryDistribution",
+    "start": "vite",
+
+    // production build: compile shared code and then run Vite's build command
+    "build": "../gradlew :shared:jsBrowserProductionLibraryDistribution && vite build"
   },
   "dependencies": {
     "react": "^18.2.0",
