@@ -33,13 +33,13 @@ jobs:
           node-version: "20"
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
-
       - name: Build shared Kotlin/JS library
         run: |
           chmod +x ./gradlew
           ./gradlew :shared:jsBrowserDevelopmentLibraryDistribution
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Build web app
         run: npm run build
