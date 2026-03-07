@@ -15,20 +15,6 @@ type PaymentStatus =
   | { kind: 'success'; message: string }
   | { kind: 'error'; message: string };
 
-<<<<<<< HEAD
-type StreamSendResponse = {
-  id?: string;
-  status?: string;
-  deliveredAmount?: string | number;
-  [key: string]: unknown;
-};
-
-function createStreamCompatibleInterledgerClient(): InterledgerClient {
-  let selfAccount = '';
-  let targetAccount = '';
-  const streamEndpoint =
-    import.meta.env.VITE_STREAM_SENDER_ENDPOINT ?? 'http://localhost:3000/stream/send';
-=======
 type StreamPaymentRequest = {
   senderAccount: string;
   destinationPaymentPointer: string;
@@ -45,7 +31,6 @@ function createInterledgerClient(): InterledgerClient {
   let targetAccount = '';
   let streamEndpoint = normalizeEndpoint(import.meta.env.VITE_STREAM_SENDER_ENDPOINT ?? '');
   let authToken = (import.meta.env.VITE_INTERLEDGER_API_TOKEN ?? '').trim();
->>>>>>> 3e5f0bc (Use real STREAM API calls in web frontend)
 
   return {
     setSelfAccount: (value: string) => {
@@ -61,42 +46,17 @@ function createInterledgerClient(): InterledgerClient {
       authToken = value.trim();
     },
     sendPayment: async (amount: number) => {
-<<<<<<< HEAD
       if (!selfAccount) {
         throw new Error('Sender ILP account is required.');
       }
       if (!targetAccount) {
         throw new Error('Destination payment pointer is required.');
       }
-
-      const response = await fetch(streamEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          senderAccount: selfAccount,
-          destinationPaymentPointer: targetAccount,
-          sourceAmount: String(Math.trunc(amount)),
-          protocol: 'STREAM'
-        })
-      });
-
-      if (!response.ok) {
-        const body = await response.text();
-        throw new Error(body || `STREAM payment failed with HTTP ${response.status}.`);
-      }
-
-      const raw = (await response.json()) as StreamSendResponse;
-      return {
-        ...raw,
-=======
       if (!streamEndpoint) {
         throw new Error('Interledger STREAM endpoint is required.');
       }
 
       const payload: StreamPaymentRequest = {
->>>>>>> 3e5f0bc (Use real STREAM API calls in web frontend)
         senderAccount: selfAccount,
         destinationPaymentPointer: targetAccount,
         sourceAmount: String(Math.trunc(amount)),
@@ -119,11 +79,17 @@ function createInterledgerClient(): InterledgerClient {
 
       const responseText = await response.text();
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${responseText || response.statusText}`);
+        throw new Error(responseText || `STREAM payment failed with HTTP ${response.status}.`);
       }
 
       if (!responseText) {
-        return { ok: true };
+        return {
+          senderAccount: selfAccount,
+          destinationPaymentPointer: targetAccount,
+          sourceAmount: String(Math.trunc(amount)),
+          protocol: 'STREAM',
+          status: 'ok'
+        };
       }
 
       try {
@@ -136,11 +102,7 @@ function createInterledgerClient(): InterledgerClient {
 }
 
 export function App() {
-<<<<<<< HEAD
-  const interledgerClient = useMemo(() => createStreamCompatibleInterledgerClient(), []);
-=======
   const interledgerClient = useMemo(() => createInterledgerClient(), []);
->>>>>>> 3e5f0bc (Use real STREAM API calls in web frontend)
 
   const [streamEndpoint, setStreamEndpoint] = useState(import.meta.env.VITE_STREAM_SENDER_ENDPOINT ?? '');
   const [apiToken, setApiToken] = useState(import.meta.env.VITE_INTERLEDGER_API_TOKEN ?? '');
@@ -189,9 +151,6 @@ export function App() {
     <main className="app-shell">
       <section className="payment-card">
         <h1>Interledger Payment Demo</h1>
-<<<<<<< HEAD
-        <p className="subtitle">Send a STREAM-compatible Interledger payment.</p>
-=======
         <p className="subtitle">Send a STREAM-compatible Interledger payment request.</p>
 
         <label>
@@ -214,7 +173,6 @@ export function App() {
             autoComplete="off"
           />
         </label>
->>>>>>> 3e5f0bc (Use real STREAM API calls in web frontend)
 
         <label>
           Self ILP Address
