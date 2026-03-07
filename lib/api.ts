@@ -1,4 +1,4 @@
-// Typed API client – proxied through Next.js rewrites to http://localhost:3001
+// Typed API client – uses NEXT_PUBLIC_API_URL (e.g. https://api.example.com) or /api proxy
 
 export interface FundRequest {
   requestId: string;
@@ -50,12 +50,15 @@ export interface RecipientUser {
 
 // ─── Shared helper ───────────────────────────────────────────────────────────
 
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ?? "/api";
+
 async function api<T>(
   path: string,
   init?: RequestInit
 ): Promise<{ data: T | null; error: string | null }> {
   try {
-    const res = await fetch(`/api${path}`, {
+    const res = await fetch(`${API_BASE}${path}`, {
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       ...init,

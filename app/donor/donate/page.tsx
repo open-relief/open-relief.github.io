@@ -1,16 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
 import { getRequests, initDonation, type FundRequest } from "@/lib/api";
 
 const presets = [500, 1000, 2500, 5000, 10000];
 
-export default function DonatePage() {
-  const params = useParams();
+function DonateContent() {
+  const searchParams = useSearchParams();
   const router = useRouter();
-  const requestId = params.id as string;
+  const requestId = searchParams.get("id") ?? "";
 
   const [request, setRequest] = useState<FundRequest | null>(null);
   const [loading, setLoading] = useState(true);
@@ -243,9 +243,9 @@ export default function DonatePage() {
               <button
                 onClick={handleConfirm}
                 disabled={submitting}
-                className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white py-3 rounded-lg font-semibold transition-colors text-sm"
+                className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white py-3 rounded-lg font-semibold transition-colors text-sm"
               >
-                {submitting ? "Initiating…" : "Confirm & Authorise"}
+                {submitting ? "Processing…" : `Confirm Donation – S$${finalAmount.toLocaleString()}`}
               </button>
             </div>
           </>
@@ -255,3 +255,10 @@ export default function DonatePage() {
   );
 }
 
+export default function DonatePage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-64"><p className="text-slate-400">Loading…</p></div>}>
+      <DonateContent />
+    </Suspense>
+  );
+}

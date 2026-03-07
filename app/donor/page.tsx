@@ -44,7 +44,7 @@ export default function DonorDashboard() {
                     S${Number(r.amount).toLocaleString()}
                   </span>
                   <Link
-                    href={`/donor/donate/${r.requestId}`}
+                    href={`/donor/donate?id=${r.requestId}`}
                     className="bg-amber-500 hover:bg-amber-600 text-white py-2 px-4 rounded-lg text-sm font-semibold transition-colors"
                   >
                     Donate
