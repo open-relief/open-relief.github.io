@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { getAdminRequests, patchAdminRequest, type FundRequest } from "@/lib/api";
 
 const statusColor: Record<string, string> = {
@@ -17,21 +17,11 @@ export default function AdminPayouts() {
   const [actionNote, setActionNote] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const autoOpenedRef = useRef<Set<string>>(new Set());
 
   async function load() {
     setLoading(true);
     const { data } = await getAdminRequests();
-    if (data) {
-      setRequests(data);
-      // Auto-open wallet consent for any approved requests with a pending redirect
-      data.forEach((r) => {
-        if (r.status === "approved" && r.payoutRedirectUrl && !autoOpenedRef.current.has(r.requestId)) {
-          autoOpenedRef.current.add(r.requestId);
-          window.open(r.payoutRedirectUrl, "_blank");
-        }
-      });
-    }
+    if (data) setRequests(data);
     setLoading(false);
   }
 
@@ -47,13 +37,7 @@ export default function AdminPayouts() {
     if (error) {
       setToast(`Error: ${error}`);
     } else {
-      if (data?.redirectUrl) {
-        setToast("Payout requires wallet consent. Opening consent page…");
-        autoOpenedRef.current.add(id); // prevent double-open on reload
-        setTimeout(() => window.open(data.redirectUrl, "_blank"), 800);
-      } else {
-        setToast(`Request ${status}.`);
-      }
+      setToast(`Request ${status}.`);
       load();
     }
   }
