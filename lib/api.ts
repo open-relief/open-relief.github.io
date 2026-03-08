@@ -51,7 +51,7 @@ export interface RecipientUser {
 // ─── Shared helper ───────────────────────────────────────────────────────────
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://10.197.214.67:3001";
+  process.env.NEXT_PUBLIC_API_URL ?? "http://10.197.214.67:3001/api";
 
 async function api<T>(
   path: string,
