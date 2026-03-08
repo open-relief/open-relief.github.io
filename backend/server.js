@@ -1,4 +1,5 @@
 ﻿import express from 'express'
+import cors from 'cors'
 import { PORT, PUBLIC_BASE_URL, APP_DATA_PATH, AUTO_APPROVAL_AGENT_INTERVAL_MS } from './src/config.js'
 import { runAutoApprovalAgent } from './src/agent.js'
 import { normalizeError } from './src/helpers.js'
@@ -12,6 +13,18 @@ import transfersRouter from './routes/transfers.js'
 import callbacksRouter from './routes/callbacks.js'
 
 const app = express()
+
+// Allow the GitHub Pages frontend (and localhost dev) to call this API
+app.use(cors({
+  origin: [
+    'https://open-relief.github.io',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    /^http:\/\/localhost(:\d+)?$/,
+  ],
+  credentials: true,
+}))
+
 app.use(express.json())
 app.use(express.static('public'))
 

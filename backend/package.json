@@ -14,7 +14,11 @@
     "@google/generative-ai": "^0.24.1",
     "@interledger/open-payments": "latest",
     "axios": "^1.13.6",
+    "cors": "^2.8.6",
     "dotenv": "^16.4.5",
     "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19"
   }
 }
