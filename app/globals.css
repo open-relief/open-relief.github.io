@@ -84,6 +84,14 @@ body {
   to { transform: translateY(0); opacity: 1; }
 }
 
+/* universal outline/shadow to make text readable against any background */
+html, body, body * {
+  /* thin stroke plus a faint shadow gives the effect of a bold outline */
+  -webkit-text-stroke: 0.5px #000;
+  text-stroke: 0.5px #000;
+  text-shadow: 1px 1px 2px #000;
+}
+
 .animate-fade-in {
   animation: fadeIn 0.4s ease-out;
 }
