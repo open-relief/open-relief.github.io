@@ -63,7 +63,7 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center px-4 py-16 animate-fade-in">
+    <main className="h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center px-4 py-16 overflow-hidden animate-fade-in">
       {/* Hero */}
       <div className="text-center mb-12 animate-slide-down">
         <div className="inline-flex items-center gap-2 bg-red-500/20 text-red-300 border border-red-500/30 rounded-full px-5 py-2 text-base font-medium mb-6">
@@ -135,7 +135,7 @@ export default function Home() {
 // mobile-specific home screen rendered when `app1212` agent is detected
 function MobileHome({ stats }: { stats: { label: string; value: string }[] | null }) {
   return (
-    <main className="min-h-screen bg-emerald-50 flex flex-col items-center p-4 animate-fade-in">
+    <main className="h-full bg-emerald-50 flex flex-col items-center p-4 overflow-hidden animate-fade-in">
       <h1 className="text-3xl font-bold text-emerald-600 mb-4">Open Relief</h1>
       <p className="text-slate-700 text-center mb-6">
         OpenRelief1.0

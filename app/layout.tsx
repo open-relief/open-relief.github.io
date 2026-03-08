@@ -23,8 +23,8 @@ export default function RootLayout({
       <body className={`${inter.className} bg-slate-50 text-slate-900 antialiased dark:bg-slate-900 dark:text-slate-100 overflow-hidden`}>
         <AppProvider>
           <Header />
-          {/* make the content area scrollable while keeping the body canned */}
-          <div className="pt-16 h-screen overflow-auto">{/* offset for fixed header */}
+          {/* content area fills the remaining viewport height; only it scrolls */}
+          <div className="pt-16 h-screen overflow-hidden">
             {children}
           </div>
         </AppProvider>
