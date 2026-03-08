@@ -1,8 +1,10 @@
 import express from 'express'
+import { randomUUID } from 'crypto'
 import { fundRequests, transfers, persistFundRequests, userAccounts } from '../src/store.js'
 import { ensureAdmin } from '../src/sessions.js'
-import { normalizeRequestStatus } from '../src/helpers.js'
+import { normalizeRequestStatus, normalizeError } from '../src/helpers.js'
 import { runAutoApprovalAgent, approveRequestAndTriggerPayout } from '../src/agent.js'
+import { executeShawnPayoutForRequest } from '../src/payments.js'
 
 const router = express.Router()
 
@@ -92,6 +94,47 @@ router.patch('/api/admin/requests/:id', async (req, res) => {
   requestRecord.updatedAt = new Date().toISOString()
   persistFundRequests()
   return res.json(requestRecord)
+})
+
+// Initiate a real Interledger payout from the platform wallet to a recipient.
+// The request data (wallet address + amount) comes from the frontend; the
+// sender credentials come from the backend .env (DONATION_RECIPIENT_*).
+router.post('/api/admin/payout/initiate', async (req, res) => {
+  if (!ensureAdmin(req, res)) return
+
+  const recipientWalletAddress = String(req.body?.recipientWalletAddress || '').trim()
+  const amount = String(req.body?.amount || '').trim()
+  const requestId = String(req.body?.requestId || randomUUID()).trim()
+
+  if (!recipientWalletAddress || !/^https?:\/\//i.test(recipientWalletAddress)) {
+    return res.status(400).json({ error: 'recipientWalletAddress must be a valid HTTPS wallet URL' })
+  }
+  if (!/^\d+$/.test(amount) || Number(amount) <= 0) {
+    return res.status(400).json({ error: 'amount must be a positive integer string (minor units)' })
+  }
+
+  const syntheticRecord = {
+    requestId,
+    requesterWalletAddress: recipientWalletAddress,
+    amount,
+    status: 'approved',
+    payoutStatus: null,
+    payoutRedirectUrl: null,
+  }
+
+  try {
+    const payout = await executeShawnPayoutForRequest(syntheticRecord)
+    return res.json({
+      requiresConsent: payout.requiresConsent,
+      redirectUrl: payout.redirectUrl || null,
+      transferId: payout.transferId,
+      status: payout.status,
+    })
+  } catch (error) {
+    const normalized = normalizeError(error)
+    console.error('[payout-initiate]', normalized)
+    return res.status(500).json({ error: normalized })
+  }
 })
 
 export default router

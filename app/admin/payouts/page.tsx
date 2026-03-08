@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAdminRequests, patchAdminRequest, type FundRequest } from "@/lib/api";
+import { getAdminRequests, patchAdminRequest, fundAdminRequest, type FundRequest } from "@/lib/api";
 
 const TABS = ["all", "open", "approved", "funded", "rejected"] as const;
 type Tab = typeof TABS[number];
@@ -31,10 +31,14 @@ export default function AdminPayouts() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [toastError, setToastError] = useState(false);
+  // Consent flow: when ILP requires interactive grant, we show an overlay.
+  const [consentUrl, setConsentUrl] = useState<string | null>(null);
+  const [consentRequestId, setConsentRequestId] = useState<string | null>(null);
 
-  function showToast(msg: string) {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3000);
+  function showToast(msg: string, isError = false) {
+    setToast(msg); setToastError(isError);
+    setTimeout(() => setToast(null), 4000);
   }
 
   async function load() {
@@ -47,17 +51,47 @@ export default function AdminPayouts() {
 
   const filtered = tab === "all" ? requests : requests.filter(r => r.status === tab);
 
-  async function doAction(requestId: string, action: "approve" | "reject" | "fund") {
+  async function doAction(requestId: string, action: "approve" | "reject" | "fund", request?: FundRequest) {
     setActionLoading(requestId + action);
-    if (action === "fund") {
-      await patchAdminRequest(requestId, { status: "funded" });
-      showToast("Payout funded ✓");
+    if (action === "fund" && request) {
+      const walletAddress = request.requesterWalletAddress?.trim();
+      if (!walletAddress || !/^https?:\/\//i.test(walletAddress)) {
+        showToast("Recipient has no wallet address — cannot send ILP payment", true);
+        setActionLoading(null);
+        return;
+      }
+      const { data, error } = await fundAdminRequest(requestId, walletAddress, request.amount);
+      setActionLoading(null);
+      if (error) {
+        showToast(`Payout failed: ${error}`, true);
+        return;
+      }
+      if (data!.requiresConsent && data!.redirectUrl) {
+        // Interactive grant — admin must authorize in their Interledger wallet.
+        setConsentUrl(data!.redirectUrl);
+        setConsentRequestId(requestId);
+        window.open(data!.redirectUrl, "_blank", "noopener,noreferrer");
+      } else {
+        // Cached token — payment sent instantly.
+        await patchAdminRequest(requestId, { status: "funded" });
+        await load();
+        showToast("Payment sent via Interledger ✓");
+      }
     } else {
       await patchAdminRequest(requestId, { status: action === "approve" ? "approved" : "rejected" });
       showToast(action === "approve" ? "Request approved ✓" : "Request rejected");
+      await load();
+      setActionLoading(null);
     }
+  }
+
+  async function confirmConsentDone() {
+    if (!consentRequestId) return;
+    await patchAdminRequest(consentRequestId, { status: "funded" });
     await load();
-    setActionLoading(null);
+    setConsentUrl(null);
+    setConsentRequestId(null);
+    showToast("Payment authorized and request marked as funded ✓");
   }
 
   const tabCount = (t: Tab) => t === "all" ? requests.length : requests.filter(r => r.status === t).length;
@@ -68,7 +102,9 @@ export default function AdminPayouts() {
       {toast && (
         <div
           className="fixed top-6 right-6 z-50 px-5 py-3 rounded-xl text-sm font-medium animate-slide-down"
-          style={{ background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.3)", color: "#6ee7b7" }}
+          style={toastError
+            ? { background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", color: "#fca5a5" }
+            : { background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.3)", color: "#6ee7b7" }}
         >
           {toast}
         </div>
@@ -171,12 +207,12 @@ export default function AdminPayouts() {
                   )}
                   {r.status === "approved" && (
                     <button
-                      onClick={() => doAction(r.requestId, "fund")}
+                      onClick={() => doAction(r.requestId, "fund", r)}
                       disabled={!!actionLoading}
                       className="px-3 py-1 rounded-lg text-xs font-semibold transition-all"
                       style={{ background: "rgba(16,185,129,0.15)", color: "#6ee7b7", border: "1px solid rgba(16,185,129,0.25)" }}
                     >
-                      {actionLoading === r.requestId + "fund" ? "…" : "Fund →"}
+                      {actionLoading === r.requestId + "fund" ? "Sending…" : "Fund →"}
                     </button>
                   )}
                 </div>
@@ -185,6 +221,48 @@ export default function AdminPayouts() {
           </div>
         )}
       </div>
+
+      {/* Consent overlay — shown when ILP requires interactive authorization */}
+      {consentUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: "rgba(7,11,20,0.85)", backdropFilter: "blur(8px)" }}
+        >
+          <div className="glass p-8 max-w-md w-full mx-4 text-center">
+            <div
+              className="w-16 h-16 rounded-full flex items-center justify-center text-2xl mx-auto mb-5"
+              style={{ background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.3)" }}
+            >
+              🔐
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">Authorization Required</h3>
+            <p className="text-sm mb-2" style={{ color: "#94a3b8" }}>
+              A new tab has opened asking you to authorize this payout in your Interledger wallet.
+              Once you have approved it there, click the button below.
+            </p>
+            <p className="text-xs mb-6" style={{ color: "#475569" }}>
+              If the tab didn&apos;t open,{" "}
+              <a href={consentUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#f59e0b" }}>click here</a>.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={confirmConsentDone}
+                className="px-6 py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-105"
+                style={{ background: "#f59e0b", color: "#000" }}
+              >
+                I&apos;ve Authorized — Mark as Funded
+              </button>
+              <button
+                onClick={() => { setConsentUrl(null); setConsentRequestId(null); }}
+                className="px-4 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8" }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,11 +1,14 @@
 // ─── Fully client-side (localStorage) API – no backend required ──────────────
 // All data is persisted in localStorage under "or_*" keys.
 // Works as a static GitHub Pages export with zero server.
+//
+// Real Interledger payouts are bridged to the backend via NEXT_PUBLIC_BACKEND_URL.
 
 // ─── Storage helpers ──────────────────────────────────────────────────────────
 
 const ADMIN_EMAIL    = "admin@openrelief.org";
 const ADMIN_PASSWORD = "openrelief-admin";
+const BACKEND_URL    = (process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3001").replace(/\/$/, "");
 
 function ls<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -109,12 +112,49 @@ function saveRequests(r: FundRequest[]) { lsSet("or_requests", r); }
 
 // ─── Admin Auth ───────────────────────────────────────────────────────────────
 
+export interface PayoutResult {
+  requiresConsent: boolean;
+  redirectUrl: string | null;
+  transferId: string;
+  status: string;
+}
+
 export async function adminLogin(email: string, password: string) {
   if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
     lsSet("or_admin_session", { email, at: Date.now() });
+    // Also establish a real backend session so Fund button can call /api/admin/payout/initiate.
+    fetch(`${BACKEND_URL}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ email, password }),
+    }).catch(() => { /* backend offline – localStorage auth still works */ });
     return ok({ ok: true, user: { email } });
   }
   return fail<{ ok: boolean; user: { email: string } }>("Invalid email or password");
+}
+
+/** Initiate a real Interledger payout from the platform wallet to the recipient.
+ *  Requires the backend (port 3001) to be running with DONATION_RECIPIENT_* env set. */
+export async function fundAdminRequest(
+  requestId: string,
+  recipientWalletAddress: string,
+  amount: string,
+): Promise<{ data: PayoutResult | null; error: string | null }> {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/admin/payout/initiate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ requestId, recipientWalletAddress, amount }),
+    });
+    const json = await res.json();
+    if (!res.ok) return fail<PayoutResult>(json?.error ?? `HTTP ${res.status}`);
+    return ok<PayoutResult>(json as PayoutResult);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return fail<PayoutResult>(`Backend unreachable: ${msg}`);
+  }
 }
 
 export async function adminMe() {
