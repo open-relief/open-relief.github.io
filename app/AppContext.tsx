@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 
 interface AppContextValue {
   isApp: boolean;
@@ -8,7 +8,13 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue>({ isApp: false });
 
-export function AppProvider({ isApp, children }: { isApp: boolean; children: React.ReactNode }) {
+export function AppProvider({ children }: { children: React.ReactNode }) {
+  const [isApp, setIsApp] = useState(false);
+
+  useEffect(() => {
+    setIsApp(navigator.userAgent.toLowerCase().includes("app1212"));
+  }, []);
+
   return <AppContext.Provider value={{ isApp }}>{children}</AppContext.Provider>;
 }
 
