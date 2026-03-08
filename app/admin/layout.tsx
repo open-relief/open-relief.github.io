@@ -7,9 +7,9 @@ import { adminMe, adminLogout } from "@/lib/api";
 import { useApp } from "../AppContext";
 
 const navItems = [
-  { href: "/admin", label: "Dashboard", icon: "📊" },
-  { href: "/admin/payouts", label: "Payout Requests", icon: "💸" },
-  { href: "/admin/users", label: "Users", icon: "👥" },
+  { href: "/admin",         label: "Dashboard",       icon: "▦" },
+  { href: "/admin/payouts", label: "Payout Requests",  icon: "↗" },
+  { href: "/admin/users",   label: "Recipients",       icon: "◉" },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -19,7 +19,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [checking, setChecking] = useState(true);
   const { isApp } = useApp();
 
-  // Login page doesn't need the shell
   const isLoginPage = pathname === "/admin/login" || pathname === "/admin/login/";
 
   useEffect(() => {
@@ -33,13 +32,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         setChecking(false);
       }
     });
-  }, [isLoginPage]); // re-run when user leaves the login page
+  }, [isLoginPage]);
 
   if (isLoginPage) return <>{children}</>;
   if (checking) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100">
-        <p className="text-slate-500 text-sm">Checking session…</p>
+      <div className="checking-screen">
+        <div className="checking-dot" />
+        <div className="checking-dot" />
+        <div className="checking-dot" />
       </div>
     );
   }
@@ -51,18 +52,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (isApp) {
     return (
-      <div className="min-h-screen flex flex-col bg-slate-100 pt-16 animate-fade-in overflow-hidden">
-        <header className="bg-slate-900 text-white p-4 flex-shrink-0 flex items-center">
-          <Link href="/" className="text-lg font-semibold text-amber-400">
-            Open Relief
-          </Link>
-          <button
-            onClick={() => window.location.reload()}
-            className="ml-auto text-xl leading-none p-1 hover:opacity-75"
-            aria-label="Reload"
-          >
-            🔄
-          </button>
+      <div className="min-h-screen flex flex-col pt-14 animate-fade-in" style={{ background: "var(--bg)" }}>
+        <header style={{ background: "rgba(7,11,20,0.9)", borderBottom: "1px solid rgba(255,255,255,0.08)" }} className="fixed top-0 left-0 right-0 p-4 z-20">
+          <Link href="/" className="text-lg font-bold" style={{ color: "#f59e0b" }}>OpenRelief Admin</Link>
         </header>
         <main className="flex-1 p-4 overflow-auto">{children}</main>
       </div>
@@ -70,58 +62,96 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="h-full flex bg-slate-100 pt-16 overflow-hidden animate-fade-in">
+    <div className="min-h-screen flex animate-fade-in" style={{ background: "var(--bg)" }}>
       {/* Sidebar */}
-      <aside className="w-72 bg-slate-900 text-white flex flex-col fixed h-full z-10">
-        <div className="px-7 py-6 border-b border-slate-700">
-          <Link href="/" className="text-2xl font-bold text-amber-400 hover:text-amber-300">
-            Open Relief
+      <aside className="sidebar">
+        {/* Logo */}
+        <div className="px-6 py-5" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          <Link href="/" className="flex items-center gap-2">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold"
+              style={{ background: "#f59e0b", color: "#000" }}
+            >
+              OR
+            </div>
+            <div>
+              <p className="text-sm font-bold text-white leading-none">OpenRelief</p>
+              <p className="text-xs mt-0.5" style={{ color: "#64748b" }}>Admin Portal</p>
+            </div>
           </Link>
-          <p className="text-sm text-slate-400 mt-0.5">Admin Portal</p>
         </div>
-        <nav className="flex-1 px-4 py-6 space-y-1">
+
+        {/* Nav */}
+        <nav className="flex-1 px-3 py-5 space-y-1">
           {navItems.map((item) => {
-            const active = pathname === item.href;
+            const active = pathname === item.href || pathname === item.href + "/";
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-colors ${
-                  active
-                    ? "bg-amber-500 text-white"
-                    : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                }`}
+                className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-150"
+                style={active ? {
+                  background: "rgba(245,158,11,0.15)",
+                  color: "#f59e0b",
+                  border: "1px solid rgba(245,158,11,0.25)",
+                } : {
+                  color: "#64748b",
+                  border: "1px solid transparent",
+                }}
+                onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.color = "#e2e8f0"; }}
+                onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.color = "#64748b"; }}
               >
-                <span>{item.icon}</span>
+                <span className="text-base w-5 text-center">{item.icon}</span>
                 {item.label}
               </Link>
             );
           })}
         </nav>
-        <div className="px-7 py-5 border-t border-slate-700">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-amber-500 rounded-full flex items-center justify-center text-base font-bold">
-              A
+
+        {/* Footer user info */}
+        <div className="px-4 py-4" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+          <div className="flex items-center gap-3 mb-3">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+              style={{ background: "rgba(245,158,11,0.2)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)" }}
+            >
+              {userEmail[0]?.toUpperCase()}
             </div>
-            <div>
-              <p className="text-base font-medium text-white">Admin User</p>
-              <p className="text-sm text-slate-400">{userEmail}</p>
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-white truncate">{userEmail}</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: "#10b981" }} />
+                <span className="text-xs" style={{ color: "#64748b" }}>Admin</span>
+              </div>
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="mt-3 block text-sm text-slate-400 hover:text-red-400 transition"
-          >
-            Sign out
-          </button>
-          <Link href="/" className="mt-1 block text-sm text-slate-400 hover:text-slate-200">
-            ← Back to portal select
-          </Link>
+          <div className="flex gap-3">
+            <button
+              onClick={handleLogout}
+              className="text-xs transition-colors"
+              style={{ color: "#64748b" }}
+              onMouseEnter={e => (e.currentTarget.style.color = "#ef4444")}
+              onMouseLeave={e => (e.currentTarget.style.color = "#64748b")}
+            >
+              Sign out
+            </button>
+            <Link
+              href="/"
+              className="text-xs transition-colors"
+              style={{ color: "#64748b" }}
+              onMouseEnter={e => (e.currentTarget.style.color = "#e2e8f0")}
+              onMouseLeave={e => (e.currentTarget.style.color = "#64748b")}
+            >
+              ← Portal select
+            </Link>
+          </div>
         </div>
       </aside>
 
-      {/* Main content – only this area scrolls */}
-      <main className="flex-1 ml-72 p-10 overflow-y-auto h-full">{children}</main>
+      {/* Main */}
+      <main className="flex-1 min-h-screen p-8" style={{ marginLeft: 260 }}>
+        {children}
+      </main>
     </div>
   );
 }

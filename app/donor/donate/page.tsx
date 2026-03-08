@@ -1,146 +1,126 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { getRequests, initDonation, type FundRequest } from "@/lib/api";
 
-const presets = [500, 1000, 2500, 5000, 10000];
+type Step = "amount" | "wallet" | "confirm";
 
 function DonateContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const requestId = searchParams.get("id") ?? "";
+  const requestId = searchParams.get("requestId") ?? "";
 
   const [request, setRequest] = useState<FundRequest | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  // Step state
-  const [step, setStep] = useState<"amount" | "wallet" | "confirm">("amount");
-  const [amount, setAmount] = useState<number | "">("");
-  const [custom, setCustom] = useState("");
-
-  // Wallet credentials
+  const [step, setStep] = useState<Step>("amount");
+  const [inputAmount, setInputAmount] = useState("");
   const [donorWalletAddress, setDonorWalletAddress] = useState("");
   const [keyId, setKeyId] = useState("");
   const [privateKeyPath, setPrivateKeyPath] = useState("");
-
-  // Submission
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadingRequest, setLoadingRequest] = useState(true);
 
   useEffect(() => {
+    if (!requestId) { setLoadingRequest(false); return; }
     getRequests().then(({ data }) => {
-      const found = data?.find((r) => r.requestId === requestId);
-      setRequest(found ?? null);
-      setLoading(false);
+      const r = data?.find(x => x.requestId === requestId);
+      if (r) setRequest(r);
+      setLoadingRequest(false);
     });
   }, [requestId]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-slate-400">Loading…</p>
-      </div>
-    );
-  }
-
-  if (!request) {
-    return (
-      <div className="text-center py-20">
-        <p className="text-4xl mb-4">😕</p>
-        <h2 className="text-xl font-semibold text-slate-800 mb-2">Request not found</h2>
-        <Link href="/donor/campaigns" className="text-amber-600 hover:underline text-sm">
-          ← Back to fund requests
-        </Link>
-      </div>
-    );
-  }
-
-  const finalAmount = amount || Number(custom) || 0;
+  const finalAmount = inputAmount ? Math.round(parseFloat(inputAmount) * 100) / 100 : 0;
 
   async function handleConfirm() {
+    if (!request) return;
     setError(null);
     setSubmitting(true);
-    const { data, error: err } = await initDonation({
+    const { error: err } = await initDonation({
+      requestId: request.requestId,
+      amount: Math.round(finalAmount * 100),
       donorWalletAddress,
-      amount: finalAmount,
       keyId,
       privateKeyPath,
-      requestId,
     });
     setSubmitting(false);
-    if (err) {
-      setError(err);
-    } else if (data?.redirectUrl) {
-      window.location.href = data.redirectUrl;
-    }
+    if (err) { setError(err); return; }
+    router.push("/donor/history");
+  }
+
+  const cardStyle = {
+    background: "rgba(255,255,255,0.04)",
+    backdropFilter: "blur(24px)",
+    WebkitBackdropFilter: "blur(24px)",
+    border: "1px solid rgba(255,255,255,0.08)",
+    borderRadius: "1.25rem",
+    padding: "2rem",
+  } as React.CSSProperties;
+
+  const inpStyle = { background: "var(--bg2)" };
+
+  if (loadingRequest) {
+    return <div className="flex items-center justify-center h-64"><div className="flex gap-2"><div className="checking-dot" /><div className="checking-dot" /><div className="checking-dot" /></div></div>;
+  }
+  if (!request) {
+    return (
+      <div className="text-center py-20" style={{ color: "#475569" }}>
+        <p className="text-3xl mb-3">—</p>
+        <p>No fund request found.</p>
+      </div>
+    );
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="mb-6">
-        <Link href="/donor/campaigns" className="text-sm text-amber-600 hover:underline">
-          ← Back to fund requests
-        </Link>
+    <div className="max-w-md mx-auto animate-fade-in">
+      <div className="mb-7">
+        <h1 className="text-3xl font-bold text-white">Make a Donation</h1>
+        <p className="text-sm mt-1" style={{ color: "#64748b" }}>Direct payout to the recipient's registered wallet.</p>
       </div>
 
       {/* Request summary */}
-      <div className="bg-white rounded-xl shadow-sm p-6 mb-6 border border-slate-100">
-        <div className="flex items-start justify-between mb-3">
-          <h2 className="text-xl font-bold text-slate-800">{request.requesterName}</h2>
-          <span className="text-lg font-bold text-amber-600">
-            S${Number(request.amount).toLocaleString()} requested
-          </span>
-        </div>
-        <p className="text-sm text-slate-600 mb-3">{request.note}</p>
-        <p className="text-xs text-slate-400">
-          Submitted {new Date(request.createdAt).toLocaleDateString()} · Status:{" "}
-          <span className="capitalize font-medium">{request.status}</span>
-        </p>
+      <div className="rounded-xl p-4 mb-6" style={{ background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.2)" }}>
+        <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: "#a78bfa" }}>Recipient</p>
+        <p className="font-semibold text-white">{request.requesterName}</p>
+        <p className="text-sm mt-0.5" style={{ color: "#94a3b8" }}>{request.note}</p>
+        <p className="text-sm font-bold mt-2 text-white">Requested: S${Number(request.amount).toLocaleString()}</p>
       </div>
 
-      {/* Donation form */}
-      <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-100">
+      <div style={cardStyle}>
+        {/* Step indicators */}
+        <div className="flex items-center gap-3 mb-6">
+          {(["amount", "wallet", "confirm"] as Step[]).map((s, i) => (
+            <div key={s} className="flex items-center gap-3 flex-1">
+              <div
+                className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                style={step === s ? { background: "#8b5cf6", color: "#fff" } :
+                  (["amount","wallet","confirm"].indexOf(step) > i) ? { background: "rgba(139,92,246,0.3)", color: "#a78bfa" } :
+                  { background: "rgba(255,255,255,0.06)", color: "#475569" }}
+              >
+                {i + 1}
+              </div>
+              {i < 2 && <div className="flex-1 h-px" style={{ background: ["amount","wallet","confirm"].indexOf(step) > i ? "rgba(139,92,246,0.4)" : "rgba(255,255,255,0.07)" }} />}
+            </div>
+          ))}
+        </div>
+
         {step === "amount" && (
           <>
-            <h3 className="font-semibold text-slate-800 mb-5">Choose Donation Amount</h3>
-            <div className="grid grid-cols-5 gap-3 mb-4">
-              {presets.map((p) => (
-                <button
-                  key={p}
-                  onClick={() => { setAmount(p); setCustom(""); }}
-                  className={`py-2.5 rounded-lg text-sm font-semibold border-2 transition-all ${
-                    amount === p
-                      ? "border-amber-500 bg-amber-50 text-amber-700"
-                      : "border-slate-200 text-slate-600 hover:border-amber-300"
-                  }`}
-                >
-                  S${p >= 1000 ? `${p / 1000}K` : p}
-                </button>
-              ))}
+            <p className="text-sm font-semibold text-white mb-3">Donation Amount</p>
+            <div className="relative mb-5">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold" style={{ color: "#475569" }}>S$</span>
+              <input
+                type="number" min={1} step="0.01"
+                value={inputAmount} onChange={e => setInputAmount(e.target.value)}
+                placeholder="e.g. 100"
+                className="inp inp-violet" style={{ paddingLeft: "2.5rem", ...inpStyle }}
+              />
             </div>
-
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Or enter custom amount
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-semibold">S$</span>
-                <input
-                  type="number"
-                  value={custom}
-                  onChange={(e) => { setCustom(e.target.value); setAmount(""); }}
-                  placeholder="Enter amount"
-                  className="w-full pl-8 pr-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 text-sm"
-                />
-              </div>
-            </div>
-
             <button
-              disabled={!finalAmount || finalAmount < 1}
+              disabled={!finalAmount}
               onClick={() => setStep("wallet")}
-              className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-white py-3 rounded-lg font-semibold transition-colors"
+              className="w-full py-3 rounded-xl text-sm font-bold transition-all"
+              style={{ background: !finalAmount ? "rgba(139,92,246,0.3)" : "#8b5cf6", color: finalAmount ? "#fff" : "#64748b", opacity: !finalAmount ? 0.5 : 1 }}
             >
               Continue — S${finalAmount ? finalAmount.toLocaleString() : "–"}
             </button>
@@ -149,65 +129,30 @@ function DonateContent() {
 
         {step === "wallet" && (
           <>
-            <h3 className="font-semibold text-slate-800 mb-5">Your Wallet Credentials</h3>
-            <p className="text-sm text-slate-500 mb-4">
-              Provide your Open Payments wallet details to complete the donation.
-            </p>
-            <div className="space-y-4">
+            <p className="text-sm font-semibold text-white mb-4">Your Wallet Credentials</p>
+            <div className="space-y-4 mb-5">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Wallet Address (pointer URL)
-                </label>
-                <input
-                  type="url"
-                  required
-                  placeholder="https://wallet.example.com/you"
-                  value={donorWalletAddress}
-                  onChange={(e) => setDonorWalletAddress(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-                />
+                <label className="block text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: "#64748b" }}>Wallet Address</label>
+                <input type="url" required placeholder="https://wallet.example.com/you" value={donorWalletAddress} onChange={e => setDonorWalletAddress(e.target.value)} className="inp inp-violet" style={inpStyle} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Key ID</label>
-                <input
-                  type="text"
-                  required
-                  value={keyId}
-                  onChange={(e) => setKeyId(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-                />
+                <label className="block text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: "#64748b" }}>Key ID</label>
+                <input type="text" required value={keyId} onChange={e => setKeyId(e.target.value)} className="inp inp-violet" style={inpStyle} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Private Key File Path (server-side)
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="/absolute/path/to/private.key"
-                  value={privateKeyPath}
-                  onChange={(e) => setPrivateKeyPath(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
-                />
-                <p className="text-xs text-slate-400 mt-1">
-                  Path accessible on the Open Relief server.
-                </p>
+                <label className="block text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: "#64748b" }}>Private Key Path (server-side)</label>
+                <input type="text" required placeholder="/absolute/path/to/private.key" value={privateKeyPath} onChange={e => setPrivateKeyPath(e.target.value)} className="inp inp-violet font-mono" style={inpStyle} />
               </div>
             </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => setStep("amount")}
-                className="flex-1 border border-slate-200 hover:bg-slate-50 text-slate-700 py-3 rounded-lg font-semibold transition-colors text-sm"
-              >
+            <div className="flex gap-3">
+              <button onClick={() => setStep("amount")} className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8" }}>
                 Back
               </button>
-              <button
-                disabled={!donorWalletAddress || !keyId || !privateKeyPath}
-                onClick={() => setStep("confirm")}
-                className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white py-3 rounded-lg font-semibold transition-colors text-sm"
-              >
-                Review Donation
+              <button disabled={!donorWalletAddress || !keyId || !privateKeyPath} onClick={() => setStep("confirm")}
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold transition-all"
+                style={{ background: "#8b5cf6", color: "#fff", opacity: (!donorWalletAddress || !keyId || !privateKeyPath) ? 0.5 : 1 }}>
+                Review
               </button>
             </div>
           </>
@@ -215,37 +160,27 @@ function DonateContent() {
 
         {step === "confirm" && (
           <>
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-6">
-              <p className="text-sm text-slate-600">You are donating</p>
-              <p className="text-4xl font-bold text-amber-600 my-1">S${finalAmount.toLocaleString()}</p>
-              <p className="text-sm text-slate-600">
-                to <span className="font-medium">{request.requesterName}</span>
-              </p>
+            <div className="rounded-xl p-5 mb-5" style={{ background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.25)" }}>
+              <p className="text-xs" style={{ color: "#94a3b8" }}>You are donating</p>
+              <p className="text-4xl font-bold my-1" style={{ color: "#a78bfa" }}>S${finalAmount.toLocaleString()}</p>
+              <p className="text-sm" style={{ color: "#94a3b8" }}>to <span className="font-semibold text-white">{request.requesterName}</span></p>
             </div>
-
-            <div className="mb-4 text-sm text-slate-500 space-y-1">
-              <p>🔏 From wallet: <span className="font-mono text-xs">{donorWalletAddress}</span></p>
-              <p>🔒 100% of your donation goes directly to the recipient</p>
-              <p>➡️ You will be redirected to your wallet to authorize the transfer</p>
+            <div className="mb-4 text-xs space-y-1.5" style={{ color: "#64748b" }}>
+              <p>🔏 From wallet: <span className="font-mono text-white">{donorWalletAddress}</span></p>
+              <p>🔒 100% goes directly to the recipient</p>
+              <p>➡️ You will be redirected to authorize the transfer</p>
             </div>
-
-            {error && (
-              <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2 mb-4">{error}</p>
-            )}
-
+            {error && <div className="text-sm rounded-lg px-4 py-3 mb-4"
+              style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", color: "#fca5a5" }}>{error}</div>}
             <div className="flex gap-3">
-              <button
-                onClick={() => setStep("wallet")}
-                className="flex-1 border border-slate-200 hover:bg-slate-50 text-slate-700 py-3 rounded-lg font-semibold transition-colors text-sm"
-              >
+              <button onClick={() => setStep("wallet")} className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8" }}>
                 Back
               </button>
-              <button
-                onClick={handleConfirm}
-                disabled={submitting}
-                className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white py-3 rounded-lg font-semibold transition-colors text-sm"
-              >
-                {submitting ? "Processing…" : `Confirm Donation – S$${finalAmount.toLocaleString()}`}
+              <button onClick={handleConfirm} disabled={submitting}
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold transition-all"
+                style={{ background: "#8b5cf6", color: "#fff", opacity: submitting ? 0.6 : 1 }}>
+                {submitting ? "Processing…" : `Confirm S$${finalAmount.toLocaleString()}`}
               </button>
             </div>
           </>
@@ -257,7 +192,7 @@ function DonateContent() {
 
 export default function DonatePage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center h-64"><p className="text-slate-400">Loading…</p></div>}>
+    <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="flex gap-2"><div className="checking-dot" /><div className="checking-dot" /><div className="checking-dot" /></div></div>}>
       <DonateContent />
     </Suspense>
   );

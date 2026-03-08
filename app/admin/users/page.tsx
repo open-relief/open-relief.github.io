@@ -15,109 +15,115 @@ export default function AdminUsers() {
     });
   }, []);
 
-  const filtered = users.filter((u) =>
+  const filtered = users.filter(u =>
     u.email.toLowerCase().includes(search.toLowerCase()) ||
     u.pointer.toLowerCase().includes(search.toLowerCase())
   );
 
+  const avgHousehold = users.length
+    ? (users.reduce((s, u) => s + u.householdSize, 0) / users.length).toFixed(1)
+    : "—";
+  const avgIncome = users.length
+    ? `S$${(users.reduce((s, u) => s + u.perCapitaIncomeSgd, 0) / users.length).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+    : "—";
+
   return (
-    <div>
-      <div className="flex items-center justify-between mb-8">
+    <div className="animate-fade-in">
+      <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-slate-800">Recipients</h1>
-          <p className="text-base text-slate-500 mt-1">All registered recipients on the platform</p>
+          <h1 className="text-3xl font-bold text-white">Recipients</h1>
+          <p className="text-sm mt-1" style={{ color: "#64748b" }}>All registered aid recipients on the platform</p>
         </div>
         <input
           type="search"
-          placeholder="Search by email or wallet…"
+          placeholder="Search email or wallet…"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="border border-slate-200 rounded-lg px-4 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-amber-400 w-72"
+          onChange={e => setSearch(e.target.value)}
+          className="inp"
+          style={{ width: 260 }}
         />
       </div>
 
       {/* Summary */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         {[
-          { label: "Total Recipients", value: users.length },
-          {
-            label: "Avg Household Size",
-            value: users.length
-              ? (users.reduce((s, u) => s + u.householdSize, 0) / users.length).toFixed(1)
-              : "—",
-          },
-          {
-            label: "Avg Per-Capita Income",
-            value: users.length
-              ? `S$${(users.reduce((s, u) => s + u.perCapitaIncomeSgd, 0) / users.length).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-              : "—",
-          },
-        ].map((s) => (
-          <div key={s.label} className="bg-white rounded-xl p-6 shadow-sm text-center">
-            <p className="text-4xl font-bold text-slate-800">{s.value}</p>
-            <p className="text-base text-slate-500 mt-1">{s.label}</p>
+          { label: "Total Recipients",     value: users.length,  accent: "#f59e0b" },
+          { label: "Avg Household Size",   value: avgHousehold,  accent: "#8b5cf6" },
+          { label: "Avg Per-Capita Income",value: avgIncome,     accent: "#10b981" },
+        ].map(s => (
+          <div key={s.label} className="glass p-5 text-center">
+            <p className="text-3xl font-bold mb-1" style={{ color: s.accent }}>{s.value}</p>
+            <p className="text-xs" style={{ color: "#64748b" }}>{s.label}</p>
           </div>
         ))}
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center h-48">
-          <p className="text-slate-400">Loading…</p>
-        </div>
-      ) : (
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <table className="w-full text-base">
+      <div className="glass overflow-hidden">
+        {loading ? (
+          <div className="p-12 text-center">
+            <div className="flex justify-center gap-2">
+              <div className="checking-dot" /><div className="checking-dot" /><div className="checking-dot" />
+            </div>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
             <thead>
-              <tr className="bg-slate-50 text-slate-600 text-left">
-                <th className="px-6 py-4 font-semibold">Email</th>
-                <th className="px-6 py-4 font-semibold">Wallet Pointer</th>
-                <th className="px-6 py-4 font-semibold">Household</th>
-                <th className="px-6 py-4 font-semibold">Per-Capita Income</th>
-                <th className="px-6 py-4 font-semibold">Joined</th>
+              <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                {["Email", "Wallet Pointer", "Household", "Per-Capita Income", "Joined"].map(h => (
+                  <th
+                    key={h}
+                    className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-widest"
+                    style={{ color: "#475569" }}
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.map((u) => (
-                <tr key={u.userId} className="border-t border-slate-100 hover:bg-slate-50">
-                  <td className="px-6 py-4">
+              {filtered.map(u => (
+                <tr
+                  key={u.userId}
+                  style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+                  onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.02)")}
+                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                >
+                  <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center font-semibold text-amber-700 shrink-0">
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                        style={{ background: "rgba(245,158,11,0.15)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.25)" }}
+                      >
                         {u.email.charAt(0).toUpperCase()}
                       </div>
-                      <span className="font-medium text-slate-800">{u.email}</span>
+                      <span className="font-medium text-white">{u.email}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-slate-500 max-w-xs truncate">
-                    <a
-                      href={u.pointer}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="hover:text-amber-600 hover:underline"
-                    >
+                  <td className="px-5 py-4" style={{ color: "#64748b", maxWidth: 200 }}>
+                    <a href={u.pointer} target="_blank" rel="noreferrer"
+                      className="text-xs font-mono hover:text-white transition-colors truncate block max-w-[180px]">
                       {u.pointer.replace("https://", "")}
                     </a>
                   </td>
-                  <td className="px-6 py-4 text-slate-600">{u.householdSize}</td>
-                  <td className="px-6 py-4 text-slate-600">
-                    S${u.perCapitaIncomeSgd.toLocaleString()}
-                  </td>
-                  <td className="px-6 py-4 text-slate-500">
+                  <td className="px-5 py-4 text-sm" style={{ color: "#94a3b8" }}>{u.householdSize}</td>
+                  <td className="px-5 py-4 text-sm" style={{ color: "#94a3b8" }}>S${u.perCapitaIncomeSgd.toLocaleString()}</td>
+                  <td className="px-5 py-4 text-xs" style={{ color: "#64748b" }}>
                     {new Date(u.createdAt).toLocaleDateString()}
                   </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-16 text-center text-slate-400">
-                    <p className="text-4xl mb-3">👤</p>
-                    <p>No recipients found.</p>
+                  <td colSpan={5} className="px-5 py-16 text-center" style={{ color: "#475569" }}>
+                    <p className="text-3xl mb-3">◉</p>
+                    <p className="text-sm">No recipients found.</p>
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

@@ -5,9 +5,9 @@ import { usePathname } from "next/navigation";
 import { useApp } from "../AppContext";
 
 const navItems = [
-  { href: "/donor", label: "Dashboard", icon: "🏠" },
-  { href: "/donor/campaigns", label: "Campaigns", icon: "🌍" },
-  { href: "/donor/history", label: "My Donations", icon: "📜" },
+  { href: "/donor",           label: "Dashboard",    icon: "▦" },
+  { href: "/donor/campaigns", label: "Campaigns",    icon: "◎" },
+  { href: "/donor/history",   label: "My Donations", icon: "↺" },
 ];
 
 export default function DonorLayout({ children }: { children: React.ReactNode }) {
@@ -16,18 +16,9 @@ export default function DonorLayout({ children }: { children: React.ReactNode })
 
   if (isApp) {
     return (
-      <div className="min-h-screen flex flex-col bg-amber-50 pt-16 animate-fade-in overflow-hidden">
-        <header className="bg-amber-600 text-white p-4 flex-shrink-0 flex items-center">
-          <Link href="/" className="text-lg font-semibold">
-            Open Relief
-          </Link>
-          <button
-            onClick={() => window.location.reload()}
-            className="ml-auto text-xl leading-none p-1 hover:opacity-75"
-            aria-label="Reload"
-          >
-            🔄
-          </button>
+      <div className="min-h-screen flex flex-col pt-14 animate-fade-in" style={{ background: "var(--bg)" }}>
+        <header style={{ background: "rgba(7,11,20,0.9)", borderBottom: "1px solid rgba(255,255,255,0.08)" }} className="fixed top-0 left-0 right-0 p-4 z-20">
+          <Link href="/" className="text-lg font-bold" style={{ color: "#8b5cf6" }}>OpenRelief Donor</Link>
         </header>
         <main className="flex-1 p-4 overflow-auto">{children}</main>
       </div>
@@ -35,52 +26,64 @@ export default function DonorLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="h-full flex bg-amber-50 pt-16 overflow-hidden animate-fade-in">
+    <div className="min-h-screen flex animate-fade-in" style={{ background: "var(--bg)" }}>
       {/* Sidebar */}
-      <aside className="w-72 bg-white border-r border-amber-100 flex flex-col fixed h-full z-10">
-        <div className="px-7 py-6 border-b border-amber-100">
-          <Link href="/" className="text-2xl font-bold text-amber-600 hover:text-amber-500">
-            Open Relief
+      <aside className="sidebar">
+        <div className="px-6 py-5" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          <Link href="/" className="flex items-center gap-2">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold"
+              style={{ background: "#8b5cf6", color: "#fff" }}
+            >
+              OR
+            </div>
+            <div>
+              <p className="text-sm font-bold text-white leading-none">OpenRelief</p>
+              <p className="text-xs mt-0.5" style={{ color: "#64748b" }}>Donor Portal</p>
+            </div>
           </Link>
-          <p className="text-sm text-slate-400 mt-0.5">Donor Portal</p>
         </div>
-        <nav className="flex-1 px-4 py-6 space-y-1">
+
+        <nav className="flex-1 px-3 py-5 space-y-1">
           {navItems.map((item) => {
-            const active = pathname === item.href;
+            const active = pathname === item.href || pathname === item.href + "/";
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-colors ${
-                  active
-                    ? "bg-amber-500 text-white"
-                    : "text-slate-600 hover:bg-amber-50 hover:text-amber-700"
-                }`}
+                className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-150"
+                style={active ? {
+                  background: "rgba(139,92,246,0.15)",
+                  color: "#a78bfa",
+                  border: "1px solid rgba(139,92,246,0.25)",
+                } : {
+                  color: "#64748b",
+                  border: "1px solid transparent",
+                }}
+                onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.color = "#e2e8f0"; }}
+                onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.color = "#64748b"; }}
               >
-                <span>{item.icon}</span>
+                <span className="text-base w-5 text-center">{item.icon}</span>
                 {item.label}
               </Link>
             );
           })}
         </nav>
-        <div className="px-7 py-5 border-t border-amber-100">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-amber-500 rounded-full flex items-center justify-center text-base font-bold text-white">
-              R
-            </div>
-            <div>
-              <p className="text-base font-medium text-slate-800">Rajan Pillai</p>
-              <p className="text-sm text-slate-400">rajan@example.com</p>
-            </div>
-          </div>
-          <Link href="/" className="mt-3 block text-sm text-slate-400 hover:text-slate-600">
+
+        <div className="px-4 py-4" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+          <p className="text-xs mb-2" style={{ color: "#64748b" }}>No login required to donate</p>
+          <Link href="/" className="text-xs transition-colors" style={{ color: "#64748b" }}
+            onMouseEnter={e => (e.currentTarget.style.color = "#e2e8f0")}
+            onMouseLeave={e => (e.currentTarget.style.color = "#64748b")}
+          >
             ← Portal select
           </Link>
         </div>
       </aside>
 
-      {/* Main content – only this area scrolls */}
-      <main className="flex-1 ml-72 p-10 overflow-y-auto h-full">{children}</main>
+      <main className="flex-1 min-h-screen p-8" style={{ marginLeft: 260 }}>
+        {children}
+      </main>
     </div>
   );
 }
