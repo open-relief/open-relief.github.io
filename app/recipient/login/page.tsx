@@ -7,6 +7,17 @@ import { recipientLogin, recipientSignup } from "@/lib/api";
 export default function RecipientLoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "signup">("login");
+
+  // if no recipients are stored, default to signup so the user isn’t stuck
+  // on a login form they can't complete. this check only runs client-side.
+  useEffect(() => {
+    if (mode === "login" && typeof window !== "undefined") {
+      const stored = localStorage.getItem("or_recipients");
+      if (!stored || JSON.parse(stored).length === 0) {
+        setMode("signup");
+      }
+    }
+  }, [mode]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -58,7 +69,7 @@ export default function RecipientLoginPage() {
 
   return (
     <div className="min-h-screen bg-emerald-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-lg p-10 w-full max-w-lg">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-10 w-full max-w-lg">
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-emerald-700 rounded-xl mb-5">
             <span className="text-3xl">🤝</span>
@@ -139,7 +150,7 @@ export default function RecipientLoginPage() {
                   placeholder="-----BEGIN PRIVATE KEY-----&#10;..."
                   value={privateKey}
                   onChange={(e) => setPrivateKey(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                  className="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2.5 text-sm font-mono bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
