@@ -1,8 +1,24 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { readFileSync } from 'fs'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+
+function loadApiKey() {
+  if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY
+  try {
+    const raw = readFileSync(join(__dirname, '../../apikey.txt'), 'utf8').trim()
+    // Remove the @ sign used as an obfuscation marker in the stored key
+    return raw.replace('@', '')
+  } catch {
+    return null
+  }
+}
 
 let _genAI = null
 function getGenAI() {
-  if (!_genAI) _genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+  if (!_genAI) _genAI = new GoogleGenerativeAI(loadApiKey())
   return _genAI
 }
 
@@ -11,8 +27,9 @@ function getGenAI() {
  * Returns { decision: 'APPROVED'|'REJECTED', confidence, reasoning, risk_flags }
  */
 export async function evaluateClaim(claim, gdacsData, hdxData, gdeltData) {
-  if (!process.env.GEMINI_API_KEY) {
-    console.warn('[gemini] GEMINI_API_KEY not set — using rule-based fallback.')
+  const apiKey = loadApiKey()
+  if (!apiKey) {
+    console.warn('[gemini] GEMINI_API_KEY not set and apikey.txt not found — using rule-based fallback.')
     return ruleBased(claim, gdacsData, hdxData)
   }
 
