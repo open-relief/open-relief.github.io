@@ -51,11 +51,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (isApp) {
     return (
-      <div className="min-h-screen flex flex-col bg-slate-100 pt-16 animate-fade-in">
-        <header className="bg-slate-900 text-white p-4">
+      <div className="min-h-screen flex flex-col bg-slate-100 pt-16 animate-fade-in overflow-hidden">
+        <header className="bg-slate-900 text-white p-4 flex-shrink-0 flex items-center">
           <Link href="/" className="text-lg font-semibold text-amber-400">
             Open Relief
           </Link>
+          <button
+            onClick={() => window.location.reload()}
+            className="ml-auto text-xl leading-none p-1 hover:opacity-75"
+            aria-label="Reload"
+          >
+            🔄
+          </button>
         </header>
         <main className="flex-1 p-4 overflow-auto">{children}</main>
       </div>

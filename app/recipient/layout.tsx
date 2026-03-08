@@ -52,11 +52,19 @@ export default function RecipientLayout({ children }: { children: React.ReactNod
   // mobile rendering when our custom agent is detected
   if (isApp) {
     return (
-      <div className="min-h-screen flex flex-col bg-emerald-50">
-        <header className="bg-emerald-600 text-white p-4">
+      // container itself is locked; only the <main> area should scroll
+      <div className="min-h-screen flex flex-col bg-emerald-50 overflow-hidden">
+        <header className="bg-emerald-600 text-white p-4 flex-shrink-0 flex items-center">
           <Link href="/" className="text-lg font-semibold">
             Open Relief
           </Link>
+          <button
+            onClick={() => window.location.reload()}
+            className="ml-auto text-xl leading-none p-1 hover:opacity-75"
+            aria-label="Reload"
+          >
+            🔄
+          </button>
         </header>
         <main className="flex-1 p-4 overflow-auto">{children}</main>
       </div>
