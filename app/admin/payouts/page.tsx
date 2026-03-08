@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAdminRequests, patchAdminRequest, runAdminAgent, type FundRequest } from "@/lib/api";
+import { getAdminRequests, patchAdminRequest, type FundRequest } from "@/lib/api";
 
 const TABS = ["all", "open", "approved", "funded", "rejected"] as const;
 type Tab = typeof TABS[number];
@@ -50,8 +50,8 @@ export default function AdminPayouts() {
   async function doAction(requestId: string, action: "approve" | "reject" | "fund") {
     setActionLoading(requestId + action);
     if (action === "fund") {
-      await runAdminAgent(requestId);
-      showToast("Payout initiated via AI agent ✓");
+      await patchAdminRequest(requestId, { status: "funded" });
+      showToast("Payout funded ✓");
     } else {
       await patchAdminRequest(requestId, { status: action === "approve" ? "approved" : "rejected" });
       showToast(action === "approve" ? "Request approved ✓" : "Request rejected");
