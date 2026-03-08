@@ -18,8 +18,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${inter.className} bg-slate-50 text-slate-900 antialiased`}>
+    // force dark mode by default
+    <html lang="en" className="dark">
+      <body className={`${inter.className} bg-slate-50 text-slate-900 antialiased dark:bg-slate-900 dark:text-slate-100`}>
         <AppProvider>
           <Header />
           <div className="pt-16">{/* offset for fixed header */}

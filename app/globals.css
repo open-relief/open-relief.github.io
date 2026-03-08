@@ -19,6 +19,41 @@
   }
 }
 
+/* force-dark helper: putting .dark on <html> will shadow light
+   preferences and is used by RootLayout to make the site dark by default */
+html.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+}
+
+/* Tailwind does not know our "dark == always" requirement, so we
+   provide a few overrides for commonly used light classes.  this keeps
+   the existing markup untouched while giving the site a mostly dark
+   appearance.  additional rules can be added as needed. */
+html.dark .bg-white { background-color: #1f2937 !important; }
+html.dark .bg-white\/5 { background-color: rgba(31, 41, 55, 0.05) !important; }
+html.dark .bg-white\/10 { background-color: rgba(31, 41, 55, 0.1) !important; }
+html.dark .bg-slate-50 { background-color: #0f172a !important; }
+html.dark .bg-emerald-50 { background-color: #064e3b !important; }
+html.dark .bg-amber-50 { background-color: #78350f !important; }
+
+html.dark .text-slate-800 { color: #e5e7eb !important; }
+html.dark .text-slate-900 { color: #f9fafb !important; }
+html.dark .text-slate-500 { color: #6b7280 !important; }
+html.dark .text-slate-400 { color: #9ca3af !important; }
+
+html.dark .border-slate-100 { border-color: #334155 !important; }
+html.dark .border-slate-200 { border-color: #1e293b !important; }
+html.dark .border-emerald-100 { border-color: #064e3b !important; }
+html.dark .border-amber-100 { border-color: #78350f !important; }
+
+/* hover-state overrides */
+html.dark .hover\:bg-slate-50:hover { background-color: #0f172a !important; }
+html.dark .hover\:bg-emerald-50:hover { background-color: #064e3b !important; }
+html.dark .hover\:bg-amber-50:hover { background-color: #78350f !important; }
+html.dark .hover\:bg-slate-800:hover { background-color: #1f2937 !important; }
+html.dark .hover\:bg-slate-700:hover { background-color: #111827 !important; }
+
 body {
   background: var(--background);
   color: var(--foreground);

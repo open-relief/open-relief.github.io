@@ -54,6 +54,13 @@ router.post('/api/users/signup', (req, res) => {
   userAccounts.set(email, userRecord)
   persistUsers()
 
+  // Create a session immediately so that users are logged in after signing up
+  const session = createUserSession(userRecord)
+  res.setHeader(
+    'Set-Cookie',
+    buildSessionCookieValue(USER_SESSION_COOKIE_NAME, session.sessionId, USER_SESSION_TTL_MS)
+  )
+
   return res.status(201).json({ ok: true, user: toPublicUser(userRecord) })
 })
 

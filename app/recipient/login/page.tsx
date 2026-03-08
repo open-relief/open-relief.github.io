@@ -42,6 +42,13 @@ export default function RecipientLoginPage() {
       });
       setLoading(false);
       if (err) { setError(err); return; }
+
+      // backend now creates a session cookie on signup, but it doesn't
+      // hurt to re‑authenticate in case the new cookie hasn't propagated yet
+      // or the server doesn't.  we ignore any error because the user will be
+      // sent to the dashboard anyway and the layout check will redirect them
+      // back to login if necessary.
+      recipientLogin(email, password).catch(() => {});
     }
 
     // trailingSlash config will append a `/` automatically, but
