@@ -138,7 +138,7 @@ function MobileHome({ stats }: { stats: { label: string; value: string }[] | nul
     <main className="min-h-screen bg-emerald-50 flex flex-col items-center p-4">
       <h1 className="text-3xl font-bold text-emerald-600 mb-4">Open Relief</h1>
       <p className="text-slate-700 text-center mb-6">
-        You're viewing the mobile-friendly interface (user agent &quot;app1212&quot;).
+        OpenRelief1.0
       </p>
       {stats && (
         <div className="w-full mb-6 space-y-4">
