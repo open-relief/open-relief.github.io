@@ -7,10 +7,10 @@ import { recipientMe, recipientLogout, type RecipientUser } from "@/lib/api";
 import { useApp } from "../AppContext";
 
 const navItems = [
-  { href: "/recipient", label: "Dashboard", icon: "🏠" },
-  { href: "/recipient/apply", label: "Apply for Aid", icon: "📝" },
-  { href: "/recipient/status", label: "My Applications", icon: "📋" },
-  { href: "/recipient/profile", label: "Profile", icon: "👤" },
+  { href: "/recipient/", label: "Dashboard", icon: "🏠" },
+  { href: "/recipient/apply/", label: "Apply for Aid", icon: "📝" },
+  { href: "/recipient/status/", label: "My Applications", icon: "📋" },
+  { href: "/recipient/profile/", label: "Profile", icon: "👤" },
 ];
 
 export default function RecipientLayout({ children }: { children: React.ReactNode }) {
@@ -20,20 +20,31 @@ export default function RecipientLayout({ children }: { children: React.ReactNod
   const [checking, setChecking] = useState(true);
   const { isApp } = useApp();
 
-  const isLoginPage = pathname === "/recipient/login";
+  // Next is configured with `trailingSlash: true`, so the runtime pathname
+  // will usually end in a `/` even though our source files don’t include it.
+  // Compare both forms when detecting the login page to avoid running the
+  // auth-check effect on the login route itself. When we redirect later we
+  // also include the trailing slash so that Next doesn’t issue its own
+  // automatic bounce back to the slash version, which was causing an infinite
+  // reload loop in development.
+  const RECIPIENT_LOGIN_PATH = "/recipient/login/";
+  const isLoginPage = pathname === RECIPIENT_LOGIN_PATH || pathname === "/recipient/login";
 
   useEffect(() => {
-    if (isLoginPage) { setChecking(false); return; }
+    if (isLoginPage) {
+      setChecking(false);
+      return;
+    }
 
     const fallback = setTimeout(() => {
-      window.location.replace("/recipient/login");
+      window.location.replace(RECIPIENT_LOGIN_PATH);
     }, 6000);
 
     recipientMe()
       .then(({ data }) => {
         clearTimeout(fallback);
         if (!data?.authenticated) {
-          window.location.replace("/recipient/login");
+          window.location.replace(RECIPIENT_LOGIN_PATH);
         } else {
           setUser(data.user);
           setChecking(false);
@@ -41,9 +52,13 @@ export default function RecipientLayout({ children }: { children: React.ReactNod
       })
       .catch(() => {
         clearTimeout(fallback);
-        window.location.replace("/recipient/login");
+        window.location.replace(RECIPIENT_LOGIN_PATH);
       });
-  }, [pathname, isLoginPage, router]);
+
+    return () => {
+      clearTimeout(fallback);
+    };
+  }, [pathname, isLoginPage]);
 
   if (isLoginPage) return <>{children}</>;
   if (checking) {
@@ -56,7 +71,7 @@ export default function RecipientLayout({ children }: { children: React.ReactNod
 
   async function handleLogout() {
     await recipientLogout();
-    router.push("/recipient/login");
+    router.push(RECIPIENT_LOGIN_PATH);
   }
 
   // mobile rendering when our custom agent is detected
@@ -85,7 +100,7 @@ export default function RecipientLayout({ children }: { children: React.ReactNod
         </div>
         <nav className="flex-1 px-4 py-6 space-y-1">
           {navItems.map((item) => {
-            const active = pathname === item.href;
+            const active = pathname === item.href || pathname === item.href.replace(/\/$/, "");
             return (
               <Link
                 key={item.href}

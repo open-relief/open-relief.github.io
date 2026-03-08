@@ -20,7 +20,8 @@ export default function AdminLoginPage() {
     if (err) {
       setError(err);
     } else {
-      router.push("/admin");
+      // include the trailing slash so Next doesn't issue a redirect
+      router.push("/admin/");
     }
   }
 

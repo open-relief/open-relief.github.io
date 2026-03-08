@@ -7,9 +7,9 @@ import { adminMe, adminLogout } from "@/lib/api";
 import { useApp } from "../AppContext";
 
 const navItems = [
-  { href: "/admin", label: "Dashboard", icon: "📊" },
-  { href: "/admin/payouts", label: "Payout Requests", icon: "💸" },
-  { href: "/admin/users", label: "Users", icon: "👥" },
+  { href: "/admin/", label: "Dashboard", icon: "📊" },
+  { href: "/admin/payouts/", label: "Payout Requests", icon: "💸" },
+  { href: "/admin/users/", label: "Users", icon: "👥" },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -19,21 +19,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [checking, setChecking] = useState(true);
   const { isApp } = useApp();
 
-  // Login page doesn't need the shell
-  const isLoginPage = pathname === "/admin/login";
+  // `trailingSlash: true` means the route has a trailing slash at runtime.
+  // keep a small normalization helper to avoid comparing against the wrong
+  // string.  We also use the constant below when redirecting so the browser
+  // doesn't bounce back and forth between two variants.
+  const ADMIN_LOGIN_PATH = "/admin/login/";
+  const isLoginPage = pathname === ADMIN_LOGIN_PATH || pathname === "/admin/login";
 
   useEffect(() => {
-    if (isLoginPage) { setChecking(false); return; }
+    if (isLoginPage) {
+      setChecking(false);
+      return;
+    }
 
     const fallback = setTimeout(() => {
-      window.location.replace("/admin/login");
+      window.location.replace(ADMIN_LOGIN_PATH);
     }, 6000);
 
     adminMe()
       .then(({ data }) => {
         clearTimeout(fallback);
         if (!data?.authenticated) {
-          window.location.replace("/admin/login");
+          window.location.replace(ADMIN_LOGIN_PATH);
         } else {
           if (data.user?.email) setUserEmail(data.user.email);
           setChecking(false);
@@ -41,9 +48,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       })
       .catch(() => {
         clearTimeout(fallback);
-        window.location.replace("/admin/login");
+        window.location.replace(ADMIN_LOGIN_PATH);
       });
-  }, [pathname, isLoginPage, router]);
+
+    return () => {
+      clearTimeout(fallback);
+    };
+  }, [pathname, isLoginPage]);
 
   if (isLoginPage) return <>{children}</>;
   if (checking) {
@@ -56,7 +67,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   async function handleLogout() {
     await adminLogout();
-    router.push("/admin/login");
+    router.push(ADMIN_LOGIN_PATH);
   }
 
   if (isApp) {
@@ -84,7 +95,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
         <nav className="flex-1 px-4 py-6 space-y-1">
           {navItems.map((item) => {
-            const active = pathname === item.href;
+            const active = pathname === item.href || pathname === item.href.replace(/\/$/, "");
             return (
               <Link
                 key={item.href}

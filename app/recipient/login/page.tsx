@@ -44,7 +44,9 @@ export default function RecipientLoginPage() {
       if (err) { setError(err); return; }
     }
 
-    router.push("/recipient");
+    // trailingSlash config will append a `/` automatically, but
+    // push it explicitly to avoid an extra redirect.
+    router.push("/recipient/");
   }
 
   return (
