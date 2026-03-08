@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useApp } from "../AppContext";
 
 const navItems = [
   { href: "/donor", label: "Dashboard", icon: "🏠" },
@@ -11,6 +12,20 @@ const navItems = [
 
 export default function DonorLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { isApp } = useApp();
+
+  if (isApp) {
+    return (
+      <div className="min-h-screen flex flex-col bg-amber-50">
+        <header className="bg-amber-600 text-white p-4">
+          <Link href="/" className="text-lg font-semibold">
+            Open Relief
+          </Link>
+        </header>
+        <main className="flex-1 p-4 overflow-auto">{children}</main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex bg-amber-50">

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { recipientMe, recipientLogout, type RecipientUser } from "@/lib/api";
+import { useApp } from "../AppContext";
 
 const navItems = [
   { href: "/recipient", label: "Dashboard", icon: "🏠" },
@@ -17,6 +18,7 @@ export default function RecipientLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const [user, setUser] = useState<RecipientUser | null>(null);
   const [checking, setChecking] = useState(true);
+  const { isApp } = useApp();
 
   const isLoginPage = pathname === "/recipient/login";
 
@@ -51,6 +53,20 @@ export default function RecipientLayout({ children }: { children: React.ReactNod
   async function handleLogout() {
     await recipientLogout();
     router.push("/recipient/login");
+  }
+
+  // mobile rendering when our custom agent is detected
+  if (isApp) {
+    return (
+      <div className="min-h-screen flex flex-col bg-emerald-50">
+        <header className="bg-emerald-600 text-white p-4">
+          <Link href="/" className="text-lg font-semibold">
+            Open Relief
+          </Link>
+        </header>
+        <main className="flex-1 p-4 overflow-auto">{children}</main>
+      </div>
+    );
   }
 
   return (

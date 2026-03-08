@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getPublicMetrics, type PublicMetrics } from "@/lib/api";
+import { useApp } from "./AppContext";
 
 const roles = [
   {
@@ -42,6 +43,7 @@ function fmt(n: number) {
 
 export default function Home() {
   const [metrics, setMetrics] = useState<PublicMetrics | null>(null);
+  const { isApp } = useApp();
 
   useEffect(() => {
     getPublicMetrics().then(({ data }) => { if (data) setMetrics(data); });
@@ -54,6 +56,11 @@ export default function Home() {
         { label: "Total Funded", value: fmt(metrics.totalAmountFunded) },
       ]
     : null;
+
+  // when the custom user-agent is detected render a simplified mobile-oriented home screen
+  if (isApp) {
+    return <MobileHome stats={stats} />;
+  }
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center px-4 py-16">
@@ -125,3 +132,38 @@ export default function Home() {
   );
 }
 
+// mobile-specific home screen rendered when `app1212` agent is detected
+function MobileHome({ stats }: { stats: { label: string; value: string }[] | null }) {
+  return (
+    <main className="min-h-screen bg-emerald-50 flex flex-col items-center p-4">
+      <h1 className="text-3xl font-bold text-emerald-600 mb-4">Open Relief</h1>
+      <p className="text-slate-700 text-center mb-6">
+        You're viewing the mobile-friendly interface (user agent &quot;app1212&quot;).
+      </p>
+      {stats && (
+        <div className="w-full mb-6 space-y-4">
+          {stats.map(({ label, value }) => (
+            <div
+              key={label}
+              className="bg-white rounded-xl p-4 shadow-sm flex justify-between"
+            >
+              <span className="font-medium text-slate-800">{label}</span>
+              <span className="font-bold text-emerald-600">{value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="w-full space-y-3">
+        {roles.map((role) => (
+          <Link
+            key={role.href}
+            href={role.href}
+            className="block bg-white rounded-lg p-4 text-center font-semibold text-emerald-600 shadow hover:bg-emerald-50"
+          >
+            {role.icon} {role.label}
+          </Link>
+        ))}
+      </div>
+    </main>
+  );
+}

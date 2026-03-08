@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { adminMe, adminLogout } from "@/lib/api";
+import { useApp } from "../AppContext";
 
 const navItems = [
   { href: "/admin", label: "Dashboard", icon: "📊" },
@@ -16,6 +17,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const [userEmail, setUserEmail] = useState("admin@openrelief.org");
   const [checking, setChecking] = useState(true);
+  const { isApp } = useApp();
 
   // Login page doesn't need the shell
   const isLoginPage = pathname === "/admin/login";
@@ -51,6 +53,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   async function handleLogout() {
     await adminLogout();
     router.push("/admin/login");
+  }
+
+  if (isApp) {
+    return (
+      <div className="min-h-screen flex flex-col bg-slate-100">
+        <header className="bg-slate-900 text-white p-4">
+          <Link href="/" className="text-lg font-semibold text-amber-400">
+            Open Relief
+          </Link>
+        </header>
+        <main className="flex-1 p-4 overflow-auto">{children}</main>
+      </div>
+    );
   }
 
   return (
