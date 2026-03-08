@@ -353,14 +353,31 @@ export async function getRequests(status?: string) {
 
 // ─── Donations ────────────────────────────────────────────────────────────────
 
-export async function initDonation(_body: {
+export async function initDonation(body: {
   donorWalletAddress: string;
   amount: number;
   keyId: string;
-  privateKeyPath: string;
+  privateKey: string;
   requestId?: string;
-}) {
-  return ok({ transferId: uid(), redirectUrl: "" });
+}): Promise<{ data: { transferId: string; redirectUrl: string } | null; error: string | null }> {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/donations/init`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        donorWalletAddress: body.donorWalletAddress,
+        amount: body.amount,
+        keyId: body.keyId,
+        privateKeyPath: body.privateKey,   // backend accepts inline key text
+        requestId: body.requestId ?? null,
+      }),
+    });
+    const json = await res.json();
+    if (!res.ok) return fail(json?.error ?? "Donation init failed");
+    return ok({ transferId: json.transferId, redirectUrl: json.redirectUrl });
+  } catch (e) {
+    return fail(String(e));
+  }
 }
 
 // ─── Public Metrics ───────────────────────────────────────────────────────────
