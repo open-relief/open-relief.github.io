@@ -24,6 +24,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (isLoginPage) { setChecking(false); return; }
+    setChecking(true);
     adminMe().then(({ data }) => {
       if (!data?.authenticated) {
         router.replace("/admin/login");
@@ -32,8 +33,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         setChecking(false);
       }
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isLoginPage]); // re-run when user leaves the login page
 
   if (isLoginPage) return <>{children}</>;
   if (checking) {

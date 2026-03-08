@@ -24,6 +24,7 @@ export default function RecipientLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     if (isLoginPage) { setChecking(false); return; }
+    setChecking(true);
     recipientMe().then(({ data }) => {
       if (!data?.authenticated) {
         router.replace("/recipient/login");
@@ -32,8 +33,7 @@ export default function RecipientLayout({ children }: { children: React.ReactNod
         setChecking(false);
       }
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isLoginPage]); // re-run when user leaves the login page
 
   if (isLoginPage) return <>{children}</>;
   if (checking) {
