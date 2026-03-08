@@ -25,7 +25,7 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 animate-fade-in">
       <div className="bg-white rounded-2xl shadow-lg p-10 w-full max-w-lg">
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-800 rounded-xl mb-5">

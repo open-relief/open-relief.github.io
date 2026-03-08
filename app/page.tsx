@@ -63,9 +63,9 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center px-4 py-16">
+    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center px-4 py-16 animate-fade-in">
       {/* Hero */}
-      <div className="text-center mb-12">
+      <div className="text-center mb-12 animate-slide-down">
         <div className="inline-flex items-center gap-2 bg-red-500/20 text-red-300 border border-red-500/30 rounded-full px-5 py-2 text-base font-medium mb-6">
           <span className="w-2 h-2 bg-red-400 rounded-full animate-pulse inline-block" />
           Live disaster relief operations active
@@ -113,7 +113,7 @@ export default function Home() {
           <Link
             key={role.href}
             href={role.href}
-            className={`group relative overflow-hidden bg-white/5 hover:bg-white/10 border ${role.border}/40 hover:${role.border} rounded-2xl p-10 transition-all duration-300 hover:scale-105 hover:shadow-2xl`}
+            className={`group relative overflow-hidden bg-white/5 hover:bg-white/10 border ${role.border}/40 hover:${role.border} rounded-2xl p-10 transition-all duration-300 hover:scale-105 hover:shadow-2xl animate-fade-in`}
           >
             <div className="text-6xl mb-5">{role.icon}</div>
             <span className={`inline-block text-sm font-semibold px-4 py-1.5 rounded-full mb-4 ${role.badge}`}>
@@ -135,7 +135,7 @@ export default function Home() {
 // mobile-specific home screen rendered when `app1212` agent is detected
 function MobileHome({ stats }: { stats: { label: string; value: string }[] | null }) {
   return (
-    <main className="min-h-screen bg-emerald-50 flex flex-col items-center p-4">
+    <main className="min-h-screen bg-emerald-50 flex flex-col items-center p-4 animate-fade-in">
       <h1 className="text-3xl font-bold text-emerald-600 mb-4">Open Relief</h1>
       <p className="text-slate-700 text-center mb-6">
         OpenRelief1.0

@@ -16,7 +16,7 @@ export default function DonorDashboard() {
   }, []);
 
   return (
-    <div>
+    <div className="animate-fade-in">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-slate-800">Welcome to Open Relief 💛</h1>
         <p className="text-base text-slate-500 mt-1">Your generosity makes a real difference.</p>

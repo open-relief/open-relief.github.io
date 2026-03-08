@@ -16,7 +16,7 @@ export default function DonorLayout({ children }: { children: React.ReactNode })
 
   if (isApp) {
     return (
-      <div className="min-h-screen flex flex-col bg-amber-50">
+      <div className="min-h-screen flex flex-col bg-amber-50 pt-16 animate-fade-in">
         <header className="bg-amber-600 text-white p-4">
           <Link href="/" className="text-lg font-semibold">
             Open Relief
@@ -28,7 +28,7 @@ export default function DonorLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="min-h-screen flex bg-amber-50">
+    <div className="min-h-screen flex bg-amber-50 pt-16 animate-fade-in">
       {/* Sidebar */}
       <aside className="w-72 bg-white border-r border-amber-100 flex flex-col fixed h-full z-10">
         <div className="px-7 py-6 border-b border-amber-100">

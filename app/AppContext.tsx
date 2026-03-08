@@ -8,10 +8,17 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue>({ isApp: false });
 
-export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [isApp, setIsApp] = useState(false);
+export function AppProvider({
+  initialIsApp = false,
+  children,
+}: {
+  initialIsApp?: boolean;
+  children: React.ReactNode;
+}) {
+  const [isApp, setIsApp] = useState(initialIsApp);
 
   useEffect(() => {
+    // client-side cleanup in case UA differs
     setIsApp(navigator.userAgent.toLowerCase().includes("app1212"));
   }, []);
 
