@@ -66,7 +66,7 @@ export default function DonorDashboard() {
                   <p className="text-xs mt-0.5" style={{ color: "#475569" }}>{new Date(r.createdAt).toLocaleDateString()}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <p className="text-sm font-semibold text-white">S${Number(r.amount).toLocaleString()}</p>
+                  <p className="text-sm font-semibold text-white">S${(Number(r.amount)/100).toFixed(2)}</p>
                   <Link
                     href={`/donor/donate?requestId=${r.requestId}`}
                     className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105"

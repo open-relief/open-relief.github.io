@@ -69,7 +69,7 @@ export default function RecipientDashboard() {
                   <p className="text-xs mt-0.5" style={{ color: "#334155" }}>{new Date(r.createdAt).toLocaleDateString()}</p>
                 </div>
                 <div className="text-right flex flex-col items-end gap-1.5">
-                  <p className="text-sm font-semibold text-white">S${Number(r.amount).toLocaleString()}</p>
+                  <p className="text-sm font-semibold text-white">S${(Number(r.amount)/100).toFixed(2)}</p>
                   <Badge status={r.status} />
                 </div>
               </div>

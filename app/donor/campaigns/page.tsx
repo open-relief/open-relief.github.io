@@ -99,7 +99,7 @@ export default function CampaignsPage() {
               <p className="text-sm leading-relaxed line-clamp-2 flex-1 mb-4" style={{ color: "#94a3b8" }}>{r.note}</p>
 
               <div className="flex items-center justify-between mt-auto">
-                <p className="text-lg font-bold text-white">S${Number(r.amount).toLocaleString()}</p>
+                <p className="text-lg font-bold text-white">S${(Number(r.amount)/100).toFixed(2)}</p>
                 <Link
                   href={`/donor/donate?requestId=${r.requestId}`}
                   className="px-4 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105"

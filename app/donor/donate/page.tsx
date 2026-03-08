@@ -83,7 +83,7 @@ function DonateContent() {
         <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: "#a78bfa" }}>Recipient</p>
         <p className="font-semibold text-white">{request.requesterName}</p>
         <p className="text-sm mt-0.5" style={{ color: "#94a3b8" }}>{request.note}</p>
-        <p className="text-sm font-bold mt-2 text-white">Requested: S${Number(request.amount).toLocaleString()}</p>
+        <p className="text-sm font-bold mt-2 text-white">Requested: S${(Number(request.amount)/100).toFixed(2)}</p>
       </div>
 
       <div style={cardStyle}>

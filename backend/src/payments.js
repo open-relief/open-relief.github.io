@@ -196,7 +196,16 @@ export async function executeShawnPayoutForRequest(requestRecord) {
     const incomingPayment = await runStep('Create requester incoming payment', () =>
       client.incomingPayment.create(
         { url: recipientWallet.resourceServer, accessToken: incomingAccessToken },
-        { walletAddress: recipientWallet.id }
+        {
+          walletAddress: recipientWallet.id,
+          incomingAmount: {
+            value: amountValue,
+            assetCode: String(recipientWallet.assetCode || 'SGD').toUpperCase(),
+            assetScale: Number.isInteger(Number(recipientWallet.assetScale))
+              ? Number(recipientWallet.assetScale)
+              : 2
+          }
+        }
       )
     )
 

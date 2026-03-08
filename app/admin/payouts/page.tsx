@@ -185,7 +185,7 @@ export default function AdminPayouts() {
                   <p className="text-xs truncate max-w-[180px]" style={{ color: "#94a3b8" }}>{r.note}</p>
                 </div>
                 <div className="col-span-1">
-                  <p className="text-sm font-semibold text-white">S${Number(r.amount).toLocaleString()}</p>
+                  <p className="text-sm font-semibold text-white">S${(Number(r.amount) / 100).toFixed(2)}</p>
                 </div>
                 <div className="col-span-2">
                   <p className="text-xs" style={{ color: "#64748b" }}>{new Date(r.createdAt).toLocaleDateString()}</p>

@@ -87,7 +87,7 @@ export default function MyApplications() {
                   </p>
                 </div>
                 <div className="text-right shrink-0 ml-4">
-                  <p className="text-2xl font-bold text-white">S${Number(r.amount).toLocaleString()}</p>
+                  <p className="text-2xl font-bold text-white">S${(Number(r.amount)/100).toFixed(2)}</p>
                   {s && (
                     <span
                       className="inline-block px-3 py-1 rounded-full text-xs font-semibold capitalize mt-2"
