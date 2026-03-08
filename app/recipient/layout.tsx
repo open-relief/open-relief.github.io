@@ -24,20 +24,24 @@ export default function RecipientLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     if (isLoginPage) { setChecking(false); return; }
+
+    const fallback = setTimeout(() => {
+      window.location.replace("/recipient/login");
+    }, 6000);
+
     recipientMe()
       .then(({ data }) => {
+        clearTimeout(fallback);
         if (!data?.authenticated) {
-          router.replace("/recipient/login");
+          window.location.replace("/recipient/login");
         } else {
           setUser(data.user);
           setChecking(false);
         }
       })
       .catch(() => {
-        router.replace("/recipient/login");
-      })
-      .finally(() => {
-        setChecking(false);
+        clearTimeout(fallback);
+        window.location.replace("/recipient/login");
       });
   }, [pathname, isLoginPage, router]);
 

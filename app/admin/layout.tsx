@@ -24,20 +24,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (isLoginPage) { setChecking(false); return; }
+
+    const fallback = setTimeout(() => {
+      window.location.replace("/admin/login");
+    }, 6000);
+
     adminMe()
       .then(({ data }) => {
+        clearTimeout(fallback);
         if (!data?.authenticated) {
-          router.replace("/admin/login");
+          window.location.replace("/admin/login");
         } else {
           if (data.user?.email) setUserEmail(data.user.email);
           setChecking(false);
         }
       })
       .catch(() => {
-        router.replace("/admin/login");
-      })
-      .finally(() => {
-        setChecking(false);
+        clearTimeout(fallback);
+        window.location.replace("/admin/login");
       });
   }, [pathname, isLoginPage, router]);
 
