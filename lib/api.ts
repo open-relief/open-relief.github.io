@@ -310,12 +310,16 @@ export async function createRequest(body: {
   description?: string;
 }) {
   const session = ls<{ email: string } | null>("or_recipient_session", null);
+  // Populate wallet address from the recipient's stored profile (pointer = Open Payments URL)
+  const recipientProfile = session?.email
+    ? getRecipients().find((r) => r.email === session.email)
+    : null;
   const now = new Date().toISOString();
   const request: FundRequest = {
     requestId: uid(),
     requesterName: body.requesterName,
     requesterEmail: session?.email ?? "",
-    requesterWalletAddress: "",
+    requesterWalletAddress: recipientProfile?.pointer ?? "",
     amount: body.amount,
     note: body.note,
     householdSize: 0,
