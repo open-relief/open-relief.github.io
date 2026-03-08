@@ -72,7 +72,7 @@ export default function RecipientLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="min-h-screen flex bg-emerald-50 pt-16 animate-fade-in">
+    <div className="h-full flex bg-emerald-50 pt-16 overflow-hidden animate-fade-in">
       {/* Sidebar */}
       <aside className="w-72 bg-white border-r border-emerald-100 flex flex-col fixed h-full z-10">
         <div className="px-7 py-6 border-b border-emerald-100">
@@ -127,8 +127,8 @@ export default function RecipientLayout({ children }: { children: React.ReactNod
         </div>
       </aside>
 
-      {/* Main content */}
-      <main className="flex-1 ml-72 p-10">{children}</main>
+      {/* Main content – only this area scrolls */}
+      <main className="flex-1 ml-72 p-10 overflow-y-auto h-full">{children}</main>
     </div>
   );
 }
