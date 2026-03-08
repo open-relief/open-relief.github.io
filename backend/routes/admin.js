@@ -1,7 +1,7 @@
 import express from 'express'
 import { randomUUID } from 'crypto'
 import { fundRequests, transfers, persistFundRequests, userAccounts } from '../src/store.js'
-import { ensureAdmin } from '../src/sessions.js'
+import { ensureAdmin, getAdminSessionFromRequest } from '../src/sessions.js'
 import { normalizeRequestStatus, normalizeError } from '../src/helpers.js'
 import { runAutoApprovalAgent, approveRequestAndTriggerPayout } from '../src/agent.js'
 import { executeShawnPayoutForRequest } from '../src/payments.js'
@@ -99,8 +99,31 @@ router.patch('/api/admin/requests/:id', async (req, res) => {
 // Initiate a real Interledger payout from the platform wallet to a recipient.
 // The request data (wallet address + amount) comes from the frontend; the
 // sender credentials come from the backend .env (DONATION_RECIPIENT_*).
+// Auth: accepts session cookie OR Basic auth header (for stateless calls from the frontend).
 router.post('/api/admin/payout/initiate', async (req, res) => {
-  if (!ensureAdmin(req, res)) return
+  // Try cookie session first, then fall back to Basic auth
+  const hasCookieSession = !!getAdminSessionFromRequest(req)
+  if (!hasCookieSession) {
+    const authHeader = String(req.headers.authorization || '')
+    if (!authHeader.startsWith('Basic ')) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+    let email, password
+    try {
+      const decoded = Buffer.from(authHeader.slice(6), 'base64').toString('utf8')
+      const colon = decoded.indexOf(':')
+      email = decoded.slice(0, colon).trim().toLowerCase()
+      password = decoded.slice(colon + 1)
+    } catch {
+      return res.status(401).json({ error: 'Invalid Basic auth' })
+    }
+    const { ADMIN_USER_EMAIL, ADMIN_USER_PASSWORD } = await import('../src/config.js')
+    const { safeEqualText } = await import('../src/helpers.js')
+    if (!safeEqualText(email, String(ADMIN_USER_EMAIL).trim().toLowerCase()) ||
+        !safeEqualText(password, ADMIN_USER_PASSWORD)) {
+      return res.status(401).json({ error: 'Invalid admin credentials' })
+    }
+  }
 
   const recipientWalletAddress = String(req.body?.recipientWalletAddress || '').trim()
   const amount = String(req.body?.amount || '').trim()

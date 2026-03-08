@@ -122,6 +122,8 @@ export interface PayoutResult {
 export async function adminLogin(email: string, password: string) {
   if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
     lsSet("or_admin_session", { email, at: Date.now() });
+    // Store credentials for Basic auth on payout requests (session-independent)
+    lsSet("or_admin_creds", { email, password });
     // Also establish a real backend session so Fund button can call /api/admin/payout/initiate.
     fetch(`${BACKEND_URL}/api/auth/login`, {
       method: "POST",
@@ -142,9 +144,14 @@ export async function fundAdminRequest(
   amount: string,
 ): Promise<{ data: PayoutResult | null; error: string | null }> {
   try {
+    // Build Basic auth header from stored credentials as a stateless fallback
+    const creds = ls<{ email: string; password: string } | null>("or_admin_creds", null);
+    const basicAuth = creds
+      ? "Basic " + btoa(`${creds.email}:${creds.password}`)
+      : "Basic " + btoa(`${ADMIN_EMAIL}:${ADMIN_PASSWORD}`);
     const res = await fetch(`${BACKEND_URL}/api/admin/payout/initiate`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Authorization": basicAuth },
       credentials: "include",
       body: JSON.stringify({ requestId, recipientWalletAddress, amount }),
     });
