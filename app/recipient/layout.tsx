@@ -22,14 +22,21 @@ export default function RecipientLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     if (isLoginPage) { setChecking(false); return; }
-    recipientMe().then(({ data }) => {
-      if (!data?.authenticated) {
+    recipientMe()
+      .then(({ data }) => {
+        if (!data?.authenticated) {
+          router.replace("/recipient/login");
+        } else {
+          setUser(data.user);
+          setChecking(false);
+        }
+      })
+      .catch(() => {
         router.replace("/recipient/login");
-      } else {
-        setUser(data.user);
+      })
+      .finally(() => {
         setChecking(false);
-      }
-    });
+      });
   }, [pathname, isLoginPage, router]);
 
   if (isLoginPage) return <>{children}</>;

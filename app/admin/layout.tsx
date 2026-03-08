@@ -22,14 +22,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (isLoginPage) { setChecking(false); return; }
-    adminMe().then(({ data }) => {
-      if (!data?.authenticated) {
+    adminMe()
+      .then(({ data }) => {
+        if (!data?.authenticated) {
+          router.replace("/admin/login");
+        } else {
+          if (data.user?.email) setUserEmail(data.user.email);
+          setChecking(false);
+        }
+      })
+      .catch(() => {
         router.replace("/admin/login");
-      } else {
-        if (data.user?.email) setUserEmail(data.user.email);
+      })
+      .finally(() => {
         setChecking(false);
-      }
-    });
+      });
   }, [pathname, isLoginPage, router]);
 
   if (isLoginPage) return <>{children}</>;

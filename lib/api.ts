@@ -61,6 +61,7 @@ async function api<T>(
     const res = await fetch(`${API_BASE}${path}`, {
       credentials: "include",
       headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(8000),
       ...init,
     });
     if (!res.ok) {
